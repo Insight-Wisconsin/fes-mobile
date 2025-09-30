@@ -280,21 +280,13 @@ database/
 
 ## Communication Plan
 
-### Daily Standups:
-- **Backend:** API endpoint progress
-- **Database:** Schema design, security implementation
-- **Frontend:** UI integration, user testing
-
 ### Weekly Reviews:
 - Demo working features
 - Address blockers
 - Plan next week's priorities
 
 ### Slack Channels:
-- `#fes-backend`
-- `#fes-database`
-- `#fes-frontend`
-- `#fes-general`
+- Will make subchannels for each team, give summary of work that should be completed that week.
 
 ---
 
