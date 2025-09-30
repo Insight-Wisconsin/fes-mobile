@@ -5,6 +5,7 @@ import { useRouter, Link } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type DeviceStatusCardProps = {
   title: string;
@@ -28,6 +29,7 @@ type QuickActionProps = {
 export default function HomeScreen() {
   const router = useRouter();
   const { logout, user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const handleLogout = async () => {
     await logout();
@@ -35,7 +37,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <View>
           <ThemedText type="title" style={styles.title}>FES Device Control</ThemedText>
@@ -65,7 +67,7 @@ export default function HomeScreen() {
           <ActionButton 
             icon="settings"
             label="Calibrate"
-            onPress={() => router.push('/(app)/calibration' as any)}
+            onPress={() => router.push('/RealTimeData' as any)}
             color="#FF9500"
           />
         </View>
