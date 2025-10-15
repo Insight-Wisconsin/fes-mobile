@@ -1,12 +1,13 @@
 import { ThemedText } from '@/components/themed-text';
-import React from 'react';
-import { StyleSheet, View, ScrollView, Alert } from 'react-native';
-import { Gyroscope, DeviceMotion, Accelerometer } from 'expo-sensors';
-import { useEffect, useState, useRef } from 'react';
-import { TouchableOpacity } from 'react-native';
 import { ThemedView } from '@/components/themed-view';
+import { useAngle } from '@/contexts/AngleContext';
 import { useRouter } from 'expo-router';
+import { Accelerometer, Gyroscope } from 'expo-sensors';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+
 
 // Safe number formatter
 const formatNumber = (value: number | undefined | null): string => {
@@ -31,13 +32,13 @@ export default function RealTimeData() {
   // Raw sensor data state
   const [gyroData, setGyroData] = useState({ x: 0, y: 0, z: 0 });
   const [accelData, setAccelData] = useState({ x: 0, y: 0, z: 0 });
-  const [angleData, setAngleData] = useState({ x: 0, y: 0, z: 0 });
+  const { angleData, setAngleData } = useAngle();
   
   // Data smoothing refs
   const gyroHistory = useRef<Array<{x: number, y: number, z: number}>>([]);
   const accelHistory = useRef<Array<{x: number, y: number, z: number}>>([]);
   const angleHistory = useRef<Array<{x: number, y: number, z: number}>>([]);
-
+  
   // Data smoothing function
   const smoothSensorData = (newData: {x: number, y: number, z: number}, history: React.MutableRefObject<Array<{x: number, y: number, z: number}>>, maxHistory: number = 5) => {
     // Add new data to history
