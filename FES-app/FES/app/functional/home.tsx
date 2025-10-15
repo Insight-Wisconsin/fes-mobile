@@ -1,4 +1,4 @@
-import { StyleSheet, View, TouchableOpacity, Image } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, Image ,ScrollView} from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useRouter, Link } from 'expo-router';
@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 type DeviceStatusCardProps = {
   title: string;
   isConnected: boolean;
@@ -37,6 +36,7 @@ export default function HomeScreen() {
   };
 
   return (
+    <ScrollView>
     <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <View>
@@ -61,7 +61,10 @@ export default function HomeScreen() {
           <ActionButton 
             icon="pulse"
             label="Start Session"
-            onPress={() => router.push('/(app)/calibration' as any)}
+            onPress={() => 
+              //router.push('/(app)/calibration' as any)
+              console.log('Start Session Pressed')
+            }
             color="#34C759"
           />
           <ActionButton 
@@ -99,6 +102,7 @@ export default function HomeScreen() {
         </View>
       </View>
     </ThemedView>
+    </ScrollView>
   );
 }
 
@@ -184,6 +188,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 15,
     fontWeight: '600',
+    color: '#000000',
   },
   statusRow: {
     flexDirection: 'row',
@@ -196,6 +201,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 16,
+    color: '#000000',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -229,7 +235,7 @@ const styles = StyleSheet.create({
     gap: 15,
   },
   quickAction: {
-    width: '48%',
+    width: 165, // Two items per row with 15px gap
     backgroundColor: '#F2F2F7',
     borderRadius: 12,
     padding: 15,
@@ -244,5 +250,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 18,
     fontWeight: '600',
+    color: '#000000',
   },
 });
