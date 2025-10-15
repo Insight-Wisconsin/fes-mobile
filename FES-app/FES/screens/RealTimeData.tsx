@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   dataCard: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#000000',
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
