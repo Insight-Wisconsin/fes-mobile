@@ -70,7 +70,7 @@ export default function HomeScreen() {
           <ActionButton 
             icon="settings"
             label="Calibrate"
-            onPress={() => router.push('/RealTimeData' as any)}
+            onPress={() => router.push('/functional/calibration' as any)}
             color="#FF9500"
           />
         </View>

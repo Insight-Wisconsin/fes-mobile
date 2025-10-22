@@ -7,6 +7,7 @@ import { TouchableOpacity } from 'react-native';
 import { ThemedView } from '@/components/themed-view';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { calibrationService } from '../services/backend/calibration';
 
 // Safe number formatter
 const formatNumber = (value: number | undefined | null): string => {
@@ -177,6 +178,11 @@ export default function RealTimeData() {
       }
     };
   }, []);
+
+  // Update calibration service with current y angle
+  useEffect(() => {
+    calibrationService.updateAngleData(angleData.y);
+  }, [angleData.y]);
 
   // Calculate magnitudes
   const gyroMagnitude = Math.sqrt(gyroData.x * gyroData.x + gyroData.y * gyroData.y + gyroData.z * gyroData.z);
