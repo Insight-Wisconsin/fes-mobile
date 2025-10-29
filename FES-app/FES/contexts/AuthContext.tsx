@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/services/supabaseClient';
 import { Session } from '@supabase/supabase-js';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
 // define user table
 interface User {
@@ -91,16 +91,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // fetches user profile --> success or error 
   const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
+      console.log('🔵 Starting login for username:', username);
+      
       // Get email from username
       const { data: profileData, error: profileError } = await supabase
         .from('users')
         .select('email')
         .eq('username', username)
-        .single();
+        .maybeSingle(); // ✅ Use maybeSingle()
 
-      if (profileError || !profileData) {
+      if (profileError) {
+        console.error('❌ Error fetching profile:', profileError);
+        return { success: false, error: 'Error looking up username.' };
+      }
+
+      if (!profileData) {
+        console.log('⚠️ Username not found');
         return { success: false, error: 'Username not found.' };
       }
+
+      console.log('✅ Username found, attempting login...');
 
       // Sign in with email
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -108,15 +118,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         password: password,
       });
 
-      if (error) return { success: false, error: error.message };
+      if (error) {
+        console.error('❌ Login error:', error);
+        return { success: false, error: error.message };
+      }
 
       if (data.user) {
+        console.log('✅ Login successful');
         await fetchUserProfile(data.user.id);
         return { success: true };
       }
 
       return { success: false, error: 'Login failed' };
     } catch (error: any) {
+      console.error('❌ Unexpected login error:', error);
       return { success: false, error: error.message || 'An error occurred during login.' };
     }
   };
@@ -125,16 +140,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // creates new user data --> success or error
   const signup = async (username: string, email: string, password: string, name: string): Promise<{ success: boolean; error?: string }> => {
     try {
+      console.log('🔵 Starting signup for username:', username);
+      
       // Check username availability
-      const { data: existingUser } = await supabase
+      const { data: existingUser, error: checkError } = await supabase
         .from('users')
         .select('username')
         .eq('username', username)
-        .single();
+        .maybeSingle(); // ✅ Use maybeSingle() - returns null if not found, doesn't throw
+
+      if (checkError) {
+        console.error('❌ Error checking username:', checkError);
+        return { success: false, error: 'Error checking username availability.' };
+      }
 
       if (existingUser) {
+        console.log('⚠️ Username already exists');
         return { success: false, error: 'Username already exists.' };
       }
+
+      console.log('✅ Username available, creating auth user...');
 
       // Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -142,8 +167,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         password: password,
       });
 
-      if (authError) return { success: false, error: authError.message };
-      if (!authData.user) return { success: false, error: 'Failed to create account.' };
+      if (authError) {
+        console.error('❌ Auth signup error:', authError);
+        return { success: false, error: authError.message };
+      }
+      
+      if (!authData.user) {
+        console.error('❌ No user data returned from signup');
+        return { success: false, error: 'Failed to create account.' };
+      }
+
+      console.log('✅ Auth user created, ID:', authData.user.id);
 
       // Create profile
       const { error: profileError } = await supabase
@@ -159,12 +193,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         ]);
 
       if (profileError) {
-        return { success: false, error: 'Failed to create user profile.' };
+        console.error('❌ Profile creation error:', profileError);
+        return { success: false, error: `Failed to create user profile: ${profileError.message}` };
       }
+
+      console.log('✅ Profile created successfully');
 
       await fetchUserProfile(authData.user.id);
       return { success: true };
     } catch (error: any) {
+      console.error('❌ Unexpected signup error:', error);
       return { success: false, error: error.message || 'An error occurred during signup.' };
     }
   };
