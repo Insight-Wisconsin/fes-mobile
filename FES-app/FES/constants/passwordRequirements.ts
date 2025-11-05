@@ -139,5 +139,5 @@ export const getPasswordStrengthColor = (strength: number): string => {
   if (strength < 40) return '#FF3B30'; // Red
   if (strength < 70) return '#FF9500'; // Orange
   if (strength < 90) return '#FFCC00'; // Yellow
-  return '#34C759'; // Green
+  return '#27c54eff'; // Green
 };
