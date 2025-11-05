@@ -1,5 +1,6 @@
 import { Accelerometer } from 'expo-sensors';
-import React from 'react';
+import * as Haptics from 'expo-haptics';
+import { Vibration } from 'react-native';
 
 export interface CalibrationResult {
   angle: number;
@@ -17,15 +18,13 @@ export interface CalibrationProgress {
 
 export class CalibrationService {
   private static instance: CalibrationService;
-  private angleDataRef: React.MutableRefObject<number>;
+  private currentAngle: number = 0;
   private isMonitoring = false;
   private calibrationResults: CalibrationResult[] = [];
   private progressCallback?: (progress: CalibrationProgress) => void;
   private completionCallback?: (results: CalibrationResult[]) => void;
 
-  private constructor() {
-    this.angleDataRef = { current: 0 };
-  }
+  private constructor() {}
 
   static getInstance(): CalibrationService {
     if (!CalibrationService.instance) {
@@ -36,7 +35,7 @@ export class CalibrationService {
 
   // Method to update the current y angle from RealTimeData component
   updateAngleData(yAngle: number) {
-    this.angleDataRef.current = yAngle;
+    this.currentAngle = yAngle;
   }
 
   // Start the calibration process
@@ -59,43 +58,84 @@ export class CalibrationService {
       Accelerometer.setUpdateInterval(50); // Fast updates for real-time monitoring
 
       // Start accelerometer listener to get real-time data
+      let hasReceivedData = false;
+      let dataCount = 0;
       const accelSubscription = Accelerometer.addListener((data) => {
-        if (data && typeof data === 'object') {
+        if (data && typeof data === 'object' && data.x !== undefined && data.y !== undefined && data.z !== undefined) {
           // Convert accelerometer data to angles (same as RealTimeData)
           const angleData = this.convertAccelToAngles({
-            x: data.x || 0,
-            y: data.y || 0,
-            z: data.z || 0
+            x: data.x,
+            y: data.y,
+            z: data.z
           });
           
-          // Update the angle data reference
-          this.angleDataRef.current = angleData.y;
+          // Update the current angle
+          this.currentAngle = angleData.y;
+          hasReceivedData = true;
+          dataCount++;
         }
       });
 
-      // Perform 5 calibration steps
+      // Wait for initial accelerometer data to arrive
+      let waitCount = 0;
+      while (!hasReceivedData && waitCount < 20) {
+        await this.delay(50);
+        waitCount++;
+      }
+
+      if (!hasReceivedData) {
+        // No accelerometer data received - continue anyway
+      }
+
+      // Initial vibration: Signal to get ready for first step
+      await this.triggerHaptic();
+      this.updateProgress({
+        currentStep: 0,
+        totalSteps: 5,
+        isValidating: false,
+        validationMessage: 'Get ready! Calibration starting...'
+      });
+      await this.delay(1000); // Brief pause before starting
+
+      // Perform 5 calibration steps with haptic feedback
       for (let step = 1; step <= 5; step++) {
         if (!this.isMonitoring) break; // Allow cancellation
 
+        // Vibration 1: Signal to start step
+        await this.triggerHaptic();
         this.updateProgress({
           currentStep: step,
           totalSteps: 5,
           isValidating: true,
-          validationMessage: `Capturing foot angle ${step}/5... Walk normally for 5 seconds`
+          validationMessage: `Step ${step}/5 - Start walking now! Capture in progress...`
         });
 
+        // Capture angle for 5 seconds
         const result = await this.performCalibrationStep(step);
         this.calibrationResults.push(result);
 
+        // Vibration 2: Signal step is done
+        await this.triggerHaptic();
         this.updateProgress({
           currentStep: step,
           totalSteps: 5,
           isValidating: false,
-          validationMessage: `Foot angle ${step} captured: ${result.angle.toFixed(1)}°`
+          validationMessage: `Step ${step} complete! Captured: ${result.angle.toFixed(1)}°`
         });
 
-        // Wait a bit between steps
-        await this.delay(1000);
+        // Grace period: 3 seconds to return foot to normal position (only if not last step)
+        if (step < 5) {
+          await this.delay(3000);
+          
+          // Vibration 3: Signal to start next step
+          await this.triggerHaptic();
+          this.updateProgress({
+            currentStep: step,
+            totalSteps: 5,
+            isValidating: false,
+            validationMessage: `Get ready for step ${step + 1}/5...`
+          });
+        }
       }
 
       // Clean up accelerometer listener
@@ -114,36 +154,48 @@ export class CalibrationService {
 
   private async performCalibrationStep(stepNumber: number): Promise<CalibrationResult> {
     const monitoringDuration = 5000; // 5 seconds
+    const threshold = -15; // degrees - only capture angles less than -15 degrees (foot drop)
     const startTime = Date.now();
     
     let angleSum = 0;
     let sampleCount = 0;
+    let lastDisplayedAngle = 0;
 
-    // Monitor for 5 seconds and collect all angle readings
+    // Monitor for 5 seconds and collect ONLY angle readings less than -15 degrees (foot drop)
     while (Date.now() - startTime < monitoringDuration) {
-      const currentAngle = this.angleDataRef.current;
+      const currentAngle = this.currentAngle;
       
-      angleSum += currentAngle;
-      sampleCount++;
-
-      // Update progress with current angle
-      this.updateProgress({
-        currentStep: stepNumber,
-        totalSteps: 5,
-        currentAngle: currentAngle,
-        isValidating: true,
-        validationMessage: `Capturing foot angle... Current: ${currentAngle.toFixed(2)}°`
-      });
+      // Always show current angle in UI (even if above threshold)
+      if (Math.abs(currentAngle - lastDisplayedAngle) > 0.5 || sampleCount === 0) {
+        const remainingTime = Math.max(0, Math.ceil((monitoringDuration - (Date.now() - startTime)) / 1000));
+        this.updateProgress({
+          currentStep: stepNumber,
+          totalSteps: 5,
+          currentAngle: currentAngle,
+          isValidating: true,
+          validationMessage: currentAngle < threshold 
+            ? `Capturing foot drop... ${remainingTime}s remaining - Current: ${currentAngle.toFixed(1)}°`
+            : `Walking... ${remainingTime}s remaining - Current: ${currentAngle.toFixed(1)}° (waiting for foot drop)`
+        });
+        lastDisplayedAngle = currentAngle;
+      }
+      
+      // Only include angles less than -15 degrees in the calculation (foot drop)
+      if (currentAngle < threshold) {
+        angleSum += currentAngle;
+        sampleCount++;
+      }
 
       await this.delay(50); // Check every 50ms
     }
 
-    const averageAngle = angleSum / sampleCount;
+    // Calculate average only from angles below threshold
+    const averageAngle = sampleCount > 0 ? angleSum / sampleCount : 0;
 
     return {
       angle: averageAngle,
       timestamp: Date.now(),
-      isValid: true // Always valid since we're just capturing averages
+      isValid: sampleCount > 0 // Valid only if we captured some data below threshold
     };
   }
 
@@ -173,6 +225,21 @@ export class CalibrationService {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // Trigger haptic feedback with fallback to vibration - 1 second, one long buzz
+  private async triggerHaptic(): Promise<void> {
+    try {
+      // Use heavy impact for more noticeable feedback
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      // One long continuous vibration for 1 second
+      Vibration.vibrate(1000);
+      await this.delay(1000);
+    } catch (error) {
+      // Fallback to vibration if haptics not available - 1 second continuous
+      Vibration.vibrate(1000);
+      await this.delay(1000);
+    }
   }
 
   // Stop calibration process
