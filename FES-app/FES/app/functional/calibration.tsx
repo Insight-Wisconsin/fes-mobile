@@ -1,11 +1,10 @@
-import { StyleSheet, View, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
-import { useColorScheme } from 'react-native';
-import { calibrationService, CalibrationProgress, CalibrationResult } from '../../services/backend/calibration';
+import { useRouter } from 'expo-router';
+import { useState } from 'react';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { CalibrationProgress, CalibrationResult, calibrationService } from '../../services/backend/calibration';
 
 export default function CalibrationScreen() {
   const router = useRouter();
@@ -68,7 +67,6 @@ export default function CalibrationScreen() {
     }
   };
 
-
   const handleComplete = () => {
     // Navigate back to home after calibration
     router.back();
@@ -76,15 +74,9 @@ export default function CalibrationScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <View style={[styles.header, { borderBottomColor: colors.headerBorder }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
-        </TouchableOpacity>
-        <ThemedText type="title" style={styles.title}>Device Calibration</ThemedText>
-        <View style={{ width: 40 }} />
-      </View>
+      
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {currentStep === 1 && (
           <View style={styles.stepContainer}>
             <View style={styles.stepIndicator}>
@@ -209,12 +201,21 @@ export default function CalibrationScreen() {
               </View>
             )}
 
-            <TouchableOpacity 
-              style={styles.primaryButton}
-              onPress={handleComplete}
-            >
-              <ThemedText style={styles.primaryButtonText}>Start Session</ThemedText>
-            </TouchableOpacity>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity 
+                style={styles.primaryButton}
+                onPress={() => {}}
+              >
+                <ThemedText style={styles.primaryButtonText}>Test</ThemedText>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.primaryButton}
+                onPress={() => {}}
+              >
+                <ThemedText style={styles.primaryButtonText}>Recalibrate</ThemedText>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -242,6 +243,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
+    paddingTop: 50,
   },
   stepContainer: {
     alignItems: 'center',
@@ -313,13 +315,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    resizeMode: 'contain',
+    width: '100%',
+    marginTop: 20,
+    gap: 12,
+    marginBottom: 50,
+  },
   primaryButton: {
     backgroundColor: '#007AFF',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
-    width: '100%',
-    marginTop: 20,
+    width: '47%',
+    marginTop: 0,
   },
   primaryButtonText: {
     color: '#fff',

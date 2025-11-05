@@ -1,10 +1,9 @@
-import { StyleSheet, View, TouchableOpacity, Image ,ScrollView} from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useRouter, Link } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useColorScheme } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 type DeviceStatusCardProps = {
   title: string;
@@ -70,7 +69,7 @@ export default function HomeScreen() {
           <ActionButton 
             icon="settings"
             label="Calibrate"
-            onPress={() => router.push('/functional/calibration' as any)}
+            onPress={() => router.replace('/functional/calibration' as any)}
             color="#FF9500"
           />
         </View>
