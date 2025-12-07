@@ -1,15 +1,14 @@
 import { StyleSheet, View, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { useState } from 'react';
 import { calibrationService, CalibrationProgress, CalibrationResult } from '../../services/backend/calibration';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CalibrationScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
+  const insets = useSafeAreaInsets();
   const [currentStep, setCurrentStep] = useState(1);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -21,17 +20,6 @@ export default function CalibrationScreen() {
   });
   const [calibrationResults, setCalibrationResults] = useState<CalibrationResult[]>([]);
   const [calibrationComplete, setCalibrationComplete] = useState(false);
-
-  // Dynamic colors based on color scheme
-  const colors = {
-    instructionCard: colorScheme === 'dark' ? '#2C2C2E' : '#F2F2F7',
-    warningCard: colorScheme === 'dark' ? '#1C3A5C' : '#E3F2FD',
-    resultsContainer: colorScheme === 'dark' ? '#2C2C2E' : '#F2F2F7',
-    finalResultsContainer: colorScheme === 'dark' ? '#2C2C2E' : '#F2F2F7',
-    progressBar: colorScheme === 'dark' ? '#3A3A3C' : '#E0E0E0',
-    borderColor: colorScheme === 'dark' ? '#3A3A3C' : '#E5E5EA',
-    headerBorder: colorScheme === 'dark' ? '#3A3A3C' : '#E5E5EA',
-  };
 
   const handleStartCalibration = async () => {
     try {
@@ -75,16 +63,21 @@ export default function CalibrationScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <View style={[styles.header, { borderBottomColor: colors.headerBorder }]}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: '#FFFFFF' }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+          <Ionicons name="chevron-back" size={28} color="#007AFF" />
         </TouchableOpacity>
-        <ThemedText type="title" style={styles.title}>Device Calibration</ThemedText>
+        <View style={styles.titleContainer}>
+          <ThemedText style={styles.title} numberOfLines={1}>Calibration</ThemedText>
+        </View>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView 
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         {currentStep === 1 && (
           <View style={styles.stepContainer}>
             <View style={styles.stepIndicator}>
@@ -102,17 +95,23 @@ export default function CalibrationScreen() {
               We'll capture the angle when your foot gets "stuck" during walking to detect future foot drop episodes.
             </ThemedText>
 
-            <View style={[styles.instructionCard, { backgroundColor: colors.instructionCard }]}>
-              <Ionicons name="walk" size={24} color="#FF9500" style={styles.instructionIcon} />
+            <View style={styles.instructionCard}>
+              <View style={styles.instructionHeader}>
+                <Ionicons name="information-circle" size={20} color="#007AFF" />
+                <ThemedText style={styles.instructionTitle}>How It Works</ThemedText>
+              </View>
               <ThemedText style={styles.instructionText}>
-                Walk normally and let your foot get stuck at its natural "drop" position. We'll capture that angle 5 times for 5 seconds each.
+                For each step: (1) Return your foot to the starting position, (2) Walk and let your foot drop, (3) Hold it at the stuck position. The app will automatically detect and capture the angle. We'll do this 5 times.
               </ThemedText>
             </View>
 
-            <View style={[styles.warningCard, { backgroundColor: colors.warningCard }]}>
-              <Ionicons name="information-circle" size={24} color="#007AFF" style={styles.instructionIcon} />
-              <ThemedText style={styles.instructionText}>
-                The phone should be attached to your leg/foot to measure the angle when foot drop occurs.
+            <View style={styles.warningCard}>
+              <View style={styles.warningHeader}>
+                <Ionicons name="phone-portrait-outline" size={20} color="#FF9500" />
+                <ThemedText style={styles.warningTitle}>Device Setup</ThemedText>
+              </View>
+              <ThemedText style={styles.warningText}>
+                Make sure your phone is securely attached to your leg to measure foot movement accurately.
               </ThemedText>
             </View>
 
@@ -122,34 +121,30 @@ export default function CalibrationScreen() {
                 <ThemedText style={styles.loadingText}>
                   {calibrationProgress.validationMessage}
                 </ThemedText>
-                {calibrationProgress.currentAngle !== undefined && (
-                  <ThemedText style={styles.angleText}>
-                    Foot Angle: {calibrationProgress.currentAngle.toFixed(2)}°
-                  </ThemedText>
-                )}
                 <ThemedText style={styles.progressText}>
-                  Capturing foot angle {calibrationProgress.currentStep} of {calibrationProgress.totalSteps} ({progress.toFixed(0)}%)
+                  Step {calibrationProgress.currentStep} of {calibrationProgress.totalSteps}
                 </ThemedText>
-                <View style={[styles.progressBar, { backgroundColor: colors.progressBar }]}>
+                <View style={styles.progressBar}>
                   <View style={[styles.progressFill, { width: `${progress}%` }]} />
                 </View>
                 
-                {/* Show results as they come in */}
+                {/* Show completion status */}
                 {calibrationResults.length > 0 && (
-                  <View style={[styles.resultsContainer, { backgroundColor: colors.resultsContainer }]}>
-                    <ThemedText style={styles.resultsTitle}>Foot Angles Captured:</ThemedText>
+                  <View style={styles.resultsContainer}>
+                    <ThemedText style={styles.resultsTitle}>Progress</ThemedText>
                     {calibrationResults.map((result, index) => (
                       <View key={index} style={styles.resultRow}>
+                        <Ionicons 
+                          name={result.isValid ? "checkmark-circle" : "alert-circle"} 
+                          size={20} 
+                          color={result.isValid ? "#34C759" : "#FF9500"} 
+                          style={styles.resultIcon}
+                        />
                         <ThemedText style={styles.resultText}>
-                          Capture {index + 1}: {result.angle.toFixed(2)}°
+                          Step {index + 1} {result.isValid ? 'Complete' : 'Needs Retry'}
                         </ThemedText>
                       </View>
                     ))}
-                    {calibrationResults.length > 0 && (
-                      <ThemedText style={[styles.averageText, { borderTopColor: colors.borderColor }]}>
-                        Target Foot Drop Angle: {calibrationService.getAverageCalibrationAngle().toFixed(2)}°
-                      </ThemedText>
-                    )}
                   </View>
                 )}
               </View>
@@ -158,6 +153,7 @@ export default function CalibrationScreen() {
                 style={[styles.primaryButton, isCalibrating && styles.buttonDisabled]}
                 onPress={handleStartCalibration}
                 disabled={isCalibrating}
+                activeOpacity={0.7}
               >
                 <ThemedText style={styles.primaryButtonText}>
                   {isCalibrating ? 'Calibrating...' : 'Start Calibration'}
@@ -191,34 +187,24 @@ export default function CalibrationScreen() {
               <ThemedText style={styles.successText}>Calibration Successful!</ThemedText>
             </View>
 
-            {calibrationResults.length > 0 && (
-              <View style={[styles.finalResultsContainer, { backgroundColor: colors.finalResultsContainer }]}>
-                <ThemedText style={styles.finalResultsTitle}>Final Calibration Results</ThemedText>
-                <ThemedText style={styles.finalResultsText}>
-                  Average Foot Drop Angle: {calibrationService.getAverageCalibrationAngle().toFixed(2)}°
-                </ThemedText>
-                <View style={styles.finalResultsList}>
-                  {calibrationResults.map((result, index) => (
-                    <View key={index} style={styles.finalResultRow}>
-                      <ThemedText style={styles.finalResultText}>
-                        Capture {index + 1}: {result.angle.toFixed(2)}°
-                      </ThemedText>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
+            <View style={styles.successCard}>
+              <ThemedText style={styles.successCardTitle}>Calibration Complete</ThemedText>
+              <ThemedText style={styles.successCardText}>
+                Your device is now calibrated and ready to use. You can start a session to begin monitoring.
+              </ThemedText>
+            </View>
 
             <TouchableOpacity 
               style={styles.primaryButton}
-              onPress={handleComplete}
+              onPress={() => router.push('/functional/session' as any)}
+              activeOpacity={0.7}
             >
               <ThemedText style={styles.primaryButtonText}>Start Session</ThemedText>
             </TouchableOpacity>
           </View>
         )}
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
@@ -230,18 +216,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#E5E5EA',
   },
   backButton: {
-    padding: 8,
+    padding: 4,
+    marginLeft: -8,
+    width: 40,
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#000',
+    letterSpacing: -0.5,
+    lineHeight: 34,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   content: {
     padding: 20,
+    paddingBottom: 40,
   },
   stepContainer: {
     alignItems: 'center',
@@ -249,16 +250,17 @@ const styles = StyleSheet.create({
   stepIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 40,
   },
   stepCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 2,
     borderColor: '#E5E5EA',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
   },
   stepActive: {
     backgroundColor: '#007AFF',
@@ -272,59 +274,95 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 2,
     backgroundColor: '#E5E5EA',
-    marginHorizontal: 10,
+    marginHorizontal: 12,
+    maxWidth: 100,
   },
   stepNumber: {
-    color: '#8E8E93',
+    color: '#FFFFFF',
     fontWeight: '600',
+    fontSize: 14,
   },
   stepTitle: {
-    fontSize: 22,
-    fontWeight: '600',
-    marginBottom: 10,
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 12,
     textAlign: 'center',
+    color: '#000',
+    letterSpacing: -0.5,
   },
   stepDescription: {
-    fontSize: 16,
+    fontSize: 17,
     color: '#8E8E93',
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 32,
     lineHeight: 24,
+    paddingHorizontal: 20,
   },
   instructionCard: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 15,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
     width: '100%',
+    borderWidth: 0.5,
+    borderColor: '#E5E5EA',
   },
-  warningCard: {
+  instructionHeader: {
     flexDirection: 'row',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 30,
-    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
   },
-  instructionIcon: {
-    marginRight: 12,
+  instructionTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
+    letterSpacing: -0.4,
   },
   instructionText: {
-    flex: 1,
     fontSize: 15,
     lineHeight: 22,
+    color: '#000',
+  },
+  warningCard: {
+    backgroundColor: '#FFF9E6',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 32,
+    width: '100%',
+    borderWidth: 0.5,
+    borderColor: '#FFE082',
+  },
+  warningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  warningTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000',
+    letterSpacing: -0.4,
+  },
+  warningText: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#000',
   },
   primaryButton: {
     backgroundColor: '#007AFF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 18,
     alignItems: 'center',
     width: '100%',
-    marginTop: 20,
+    marginTop: 24,
   },
   primaryButtonText: {
     color: '#fff',
     fontSize: 17,
     fontWeight: '600',
+    letterSpacing: -0.4,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -334,18 +372,19 @@ const styles = StyleSheet.create({
     marginVertical: 40,
   },
   successCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(52, 199, 89, 0.1)',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#E8F5E9',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   successText: {
-    fontSize: 16,
+    fontSize: 17,
     textAlign: 'center',
-    marginTop: 16,
+    color: '#000',
+    fontWeight: '600',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -353,104 +392,80 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
+    marginTop: 20,
+    fontSize: 17,
+    color: '#000',
+    fontWeight: '500',
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   progressBar: {
-    height: 10,
+    height: 6,
     width: '100%',
-    borderRadius: 5,
-    marginTop: 20,
+    borderRadius: 3,
+    marginTop: 24,
+    backgroundColor: '#E5E5EA',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#007AFF',
-    borderRadius: 5,
-  },
-  angleText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#007AFF',
-    marginTop: 8,
+    borderRadius: 3,
   },
   progressText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#8E8E93',
-    marginTop: 8,
+    marginTop: 12,
+    fontWeight: '500',
   },
   resultsContainer: {
-    marginTop: 20,
+    marginTop: 32,
     width: '100%',
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 0.5,
+    borderColor: '#E5E5EA',
   },
   resultsTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    marginBottom: 8,
-    textAlign: 'center',
+    marginBottom: 16,
+    color: '#000',
+    letterSpacing: -0.4,
   },
   resultRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 12,
+    gap: 12,
+  },
+  resultIcon: {
+    marginRight: 4,
   },
   resultText: {
-    fontSize: 14,
-    flex: 1,
-  },
-  statusIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  averageText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
-    textAlign: 'center',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-  },
-  finalResultsContainer: {
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 20,
-    width: '100%',
-  },
-  finalResultsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  finalResultsText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 8,
+    fontSize: 15,
+    color: '#000',
     fontWeight: '500',
   },
-  finalResultsList: {
-    marginTop: 12,
+  successCard: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+    borderWidth: 0.5,
+    borderColor: '#C8E6C9',
   },
-  finalResultRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
+  successCardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
+    marginBottom: 8,
+    letterSpacing: -0.4,
   },
-  finalResultText: {
-    fontSize: 14,
-    flex: 1,
-  },
-  finalStatusIndicator: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginLeft: 8,
+  successCardText: {
+    fontSize: 15,
+    color: '#000',
+    lineHeight: 22,
   },
 });

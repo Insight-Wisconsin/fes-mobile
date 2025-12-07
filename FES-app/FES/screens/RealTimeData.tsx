@@ -64,23 +64,33 @@ export default function RealTimeData() {
   };
 
   // Convert accelerometer data to angles (degrees)
+  // Phone is flat on table (screen up) - we measure rotation around Z-axis (yaw)
+  // This is the ONLY angle we care about: rotation while keeping phone flat
   const convertAccelToAngles = (accelData: {x: number, y: number, z: number}) => {
     // Calculate angles from accelerometer data
     const toDegrees = (radians: number) => radians * (180 / Math.PI);
     
-    // Calculate pitch (X-axis rotation) - forward/back tilt
+    // When phone is flat on table (screen up):
+    // - Z-axis points up (perpendicular to screen)
+    // - X and Y are in the plane of the screen
+    // - Gravity points down (negative Z in phone coordinates)
+    
+    // Rotation around Z-axis (yaw) while phone is flat:
+    // When phone rotates, the X and Y components of gravity change
+    // The rotation angle = atan2(x_gravity, y_gravity)
+    // This measures how much the phone has rotated around the vertical axis
+    const rotationAngle = Math.atan2(accelData.x, accelData.y);
+    
+    // Calculate pitch (X-axis rotation) - forward/back tilt (NOT USED)
     const pitch = Math.atan2(accelData.y, accelData.z);
     
-    // Calculate roll (Y-axis rotation) - left/right tilt
+    // Calculate roll (Y-axis rotation) - left/right tilt (NOT USED)
     const roll = Math.atan2(-accelData.x, Math.sqrt(accelData.y * accelData.y + accelData.z * accelData.z));
-    
-    // Calculate yaw (Z-axis rotation) - rotation around vertical axis
-    const yaw = Math.atan2(accelData.x, accelData.y);
     
     return {
       x: toDegrees(pitch),
-      y: toDegrees(roll),
-      z: toDegrees(yaw)
+      y: toDegrees(rotationAngle), // Rotation around Z-axis (the ONLY angle we care about)
+      z: toDegrees(roll)
     };
   };
 
@@ -179,10 +189,7 @@ export default function RealTimeData() {
     };
   }, []);
 
-  // Update calibration service with current y angle
-  useEffect(() => {
-    calibrationService.updateAngleData(angleData.y);
-  }, [angleData.y]);
+  // Note: calibration service now uses gyroscope directly, so updateAngleData is no longer needed
 
   // Calculate magnitudes
   const gyroMagnitude = Math.sqrt(gyroData.x * gyroData.x + gyroData.y * gyroData.y + gyroData.z * gyroData.z);

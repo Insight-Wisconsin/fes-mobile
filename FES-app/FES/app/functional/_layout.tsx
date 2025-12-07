@@ -17,6 +17,20 @@ export default function AppLayout() {
           title: 'Calibration'
         }} 
       />
+      <Stack.Screen 
+        name="session" 
+        options={{ 
+          headerShown: false,
+          title: 'Session'
+        }} 
+      />
+      <Stack.Screen 
+        name="settings" 
+        options={{ 
+          headerShown: false,
+          title: 'Settings'
+        }} 
+      />
     </Stack>
   );
 }
