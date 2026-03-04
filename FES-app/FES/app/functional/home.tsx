@@ -108,6 +108,17 @@ export default function HomeScreen() {
   const [intensity, setIntensity] = useState(5); // 1-10 scale
   const [sessionView, setSessionView] = useState<'day' | 'month' | 'year'>('day');
 
+  // Central place to react to intensity changes (logging / Bluetooth, etc.)
+  const handleIntensityBroadcast = (level: number) => {
+    console.log('[Intensity] Current level:', level);
+    // TODO: Replace this log with Bluetooth signal sending when ready.
+  };
+
+  // Fire once on initial render (app open) and every time intensity changes.
+  useEffect(() => {
+    handleIntensityBroadcast(intensity);
+  }, [intensity]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
