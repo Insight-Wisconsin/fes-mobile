@@ -1,8 +1,9 @@
-import { StyleSheet, View, TouchableOpacity, ScrollView, Animated, PanResponder, Dimensions } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView, Animated, PanResponder, Dimensions, ActivityIndicator } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBLE } from '@/contexts/BLEContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SideMenu } from '@/components/side-menu';
 import { useState, useEffect, useRef } from 'react';
@@ -100,24 +101,32 @@ const AnimatedIcon = ({ menuVisible }: { menuVisible: boolean }) => {
   );
 };
 
+const BLE_STATUS_COLORS: Record<string, { bg: string; dot: string; text: string }> = {
+  disconnected: { bg: '#F2F2F7', dot: '#8E8E93', text: '#8E8E93' },
+  scanning:     { bg: '#FFF8E1', dot: '#FF9500', text: '#FF9500' },
+  connecting:   { bg: '#FFF8E1', dot: '#FF9500', text: '#FF9500' },
+  connected:    { bg: '#E8F5E9', dot: '#34C759', text: '#34C759' },
+  error:        { bg: '#FFEBEE', dot: '#FF3B30', text: '#FF3B30' },
+};
+
 export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const ble = useBLE();
   const insets = useSafeAreaInsets();
   const [menuVisible, setMenuVisible] = useState(false);
-  const [intensity, setIntensity] = useState(5); // 1-10 scale
+  const [intensity, setIntensity] = useState(5);
   const [sessionView, setSessionView] = useState<'day' | 'month' | 'year'>('day');
 
-  // Central place to react to intensity changes (logging / Bluetooth, etc.)
-  const handleIntensityBroadcast = (level: number) => {
-    console.log('[Intensity] Current level:', level);
-    // TODO: Replace this log with Bluetooth signal sending when ready.
-  };
-
-  // Fire once on initial render (app open) and every time intensity changes.
+  // Send intensity over BLE whenever it changes (only if connected)
   useEffect(() => {
-    handleIntensityBroadcast(intensity);
-  }, [intensity]);
+    if (ble.isConnected) {
+      ble.setIntensity(intensity);
+    }
+  }, [intensity, ble.isConnected]);
+
+  const bleColors = BLE_STATUS_COLORS[ble.connectionState] ?? BLE_STATUS_COLORS.disconnected;
+  const isWorking = ble.connectionState === 'scanning' || ble.connectionState === 'connecting';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -131,6 +140,40 @@ export default function HomeScreen() {
           <AnimatedIcon menuVisible={menuVisible} />
         </TouchableOpacity>
       </View>
+
+      {/* BLE Connection Banner */}
+      <TouchableOpacity
+        style={[styles.bleBanner, { backgroundColor: bleColors.bg }]}
+        onPress={() => {
+          if (ble.isConnected) {
+            ble.disconnect();
+          } else if (!isWorking) {
+            ble.connect();
+          }
+        }}
+        activeOpacity={0.7}
+        disabled={isWorking}
+      >
+        <View style={styles.bleBannerLeft}>
+          {isWorking ? (
+            <ActivityIndicator size="small" color={bleColors.dot} />
+          ) : (
+            <View style={[styles.bleDot, { backgroundColor: bleColors.dot }]} />
+          )}
+          <Ionicons
+            name="bluetooth"
+            size={18}
+            color={bleColors.text}
+            style={{ marginLeft: 8 }}
+          />
+          <ThemedText style={[styles.bleStatusText, { color: bleColors.text }]}>
+            {ble.statusMessage}
+          </ThemedText>
+        </View>
+        <ThemedText style={[styles.bleActionText, { color: bleColors.text }]}>
+          {ble.isConnected ? 'Disconnect' : isWorking ? '' : 'Connect'}
+        </ThemedText>
+      </TouchableOpacity>
 
       <ScrollView 
         style={styles.scrollView}
@@ -581,6 +624,35 @@ const styles = StyleSheet.create({
   },
   menuButton: {
     padding: 8,
+  },
+  bleBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginTop: 4,
+    marginBottom: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  bleBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bleDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  bleStatusText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  bleActionText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
