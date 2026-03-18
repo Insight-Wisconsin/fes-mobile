@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.https://rbdowvzyqnxmnazxnhvo.supabase.co;
+const supabaseAnonKey = process.env.sb_publishable_aVgX8OpLckGWaKC8LU75sQ_IR7kpN0e;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   // Throw early so misconfig is obvious during dev.
   throw new Error(
-    'Missing Supabase env vars. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.'
+    'Missing Supabase env vars. Set https://rbdowvzyqnxmnazxnhvo.supabase.co and sb_publishable_aVgX8OpLckGWaKC8LU75sQ_IR7kpN0e.'
   );
 }
 
