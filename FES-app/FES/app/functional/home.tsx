@@ -1,4 +1,4 @@
-import { StyleSheet, View, TouchableOpacity, ScrollView, Animated, PanResponder, Dimensions } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView, Animated, PanResponder } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SideMenu } from '@/components/side-menu';
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/services/supabase/client';
 
 type IntensityDialProps = {
   value: number; // 1-10
@@ -102,11 +103,12 @@ const AnimatedIcon = ({ menuVisible }: { menuVisible: boolean }) => {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [menuVisible, setMenuVisible] = useState(false);
   const [intensity, setIntensity] = useState(5); // 1-10 scale
   const [sessionView, setSessionView] = useState<'day' | 'month' | 'year'>('day');
+  const [savingIntensity, setSavingIntensity] = useState(false);
+  const didMountRef = useRef(false);
 
   // Central place to react to intensity changes (logging / Bluetooth, etc.)
   const handleIntensityBroadcast = (level: number) => {
@@ -114,9 +116,33 @@ export default function HomeScreen() {
     // TODO: Replace this log with Bluetooth signal sending when ready.
   };
 
+  const saveIntensityToSupabase = async (valueToSend: number) => {
+    try {
+      setSavingIntensity(true);
+      const { error } = await supabase.from('intensity_events').insert({
+        intensity: valueToSend,
+      });
+      if (error) throw error;
+      console.log('[Supabase] Saved intensity:', valueToSend);
+    } catch (e) {
+      console.error('[Supabase] Failed to save intensity', e);
+    } finally {
+      setSavingIntensity(false);
+    }
+  };
+
   // Fire once on initial render (app open) and every time intensity changes.
   useEffect(() => {
     handleIntensityBroadcast(intensity);
+  }, [intensity]);
+
+  // Auto-save every time intensity changes (skip initial screen load).
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    void saveIntensityToSupabase(intensity);
   }, [intensity]);
 
   return (
@@ -176,6 +202,27 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Intensity</ThemedText>
           <IntensityDial value={intensity} onValueChange={setIntensity} />
+          <TouchableOpacity
+            style={[styles.primaryActionButton, { marginTop: 12 }]}
+            onPress={() => saveIntensityToSupabase(intensity)}
+            activeOpacity={0.7}
+            disabled={savingIntensity}
+          >
+            <View style={styles.actionButtonContent}>
+              <View style={[styles.actionIconContainer, { backgroundColor: '#E6F4FE' }]}>
+                <Ionicons name="cloud-upload" size={32} color="#007AFF" />
+              </View>
+              <View style={styles.actionTextContainer}>
+                <ThemedText style={styles.actionTitle}>
+                  {savingIntensity ? 'Saving…' : 'Save intensity to Supabase'}
+                </ThemedText>
+                <ThemedText style={styles.actionSubtitle}>
+                  Saves current level ({intensity}) to database
+                </ThemedText>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#8E8E93" />
+            </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -337,7 +384,7 @@ const IntensityDial = ({ value, onValueChange }: IntensityDialProps) => {
   }, [value, normalizedValue]);
 
   const handleTouch = (nativeEvent: any, gestureState?: any) => {
-    const { locationX, locationY, pageX, pageY } = nativeEvent;
+    const { locationX, locationY } = nativeEvent;
     
     // Get the container's position relative to screen
     const containerX = locationX;
@@ -451,9 +498,6 @@ const IntensityDial = ({ value, onValueChange }: IntensityDialProps) => {
     return { x, y, angle: notchAngle, value: i + 1 };
   });
   
-  // Calculate active arc end angle
-  const activeEndAngle = startAngle + progress * totalAngle;
-
   return (
     <View style={styles.intensityContainer}>
       {/* Semicircle Dial */}
