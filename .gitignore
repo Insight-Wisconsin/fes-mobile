@@ -192,7 +192,10 @@ temp/
 tmp/
 
 # IDE and editor files
-.vscode/
+# Keep the two shared project files; ignore personal VS Code state.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
