@@ -7,7 +7,8 @@ import { Gyroscope } from 'expo-sensors';
 import { calibrationService } from '../../services/backend/calibration';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
+import { Buffer } from 'buffer';
 
 export default function SessionScreen() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function SessionScreen() {
   const angleHistory = useRef<number[]>([]);
   const lastImpulseTime = useRef<number>(0);
   const IMPULSE_COOLDOWN = 500; // Minimum 500ms between impulses
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
   const previousAngle = useRef<number | null>(null);
   const hasTriggeredForDrop = useRef<boolean>(false);
   
@@ -38,9 +39,9 @@ export default function SessionScreen() {
   useEffect(() => {
     const setupAudio = async () => {
       try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          shouldPlayInBackground: false,
         });
       } catch (error) {
         console.error('Failed to set audio mode:', error);
@@ -50,7 +51,8 @@ export default function SessionScreen() {
 
     return () => {
       if (soundRef.current) {
-        soundRef.current.unloadAsync();
+        soundRef.current.remove();
+        soundRef.current = null;
       }
     };
   }, []);
@@ -113,7 +115,7 @@ export default function SessionScreen() {
         return;
       }
 
-      // For native platforms, generate a simple beep using expo-av
+      // For native platforms, generate a simple beep using expo-audio
       // Create a WAV file data URI with a beep tone
       try {
         const sampleRate = 44100;
@@ -153,42 +155,25 @@ export default function SessionScreen() {
           view.setInt16(44 + i * 2, intSample * 0x7FFF, true);
         }
         
-        // Convert to base64 - use btoa for web, skip for native if not available
-        let base64: string;
-        if (typeof btoa !== 'undefined') {
-          let binary = '';
-          for (let i = 0; i < wavBytes.length; i++) {
-            binary += String.fromCharCode(wavBytes[i]);
+        // Convert the WAV bytes to a base64 data URI.
+        // Buffer works on native and web; btoa is not guaranteed on native.
+        const base64 = Buffer.from(wavBytes).toString('base64');
+        const dataUri = `data:audio/wav;base64,${base64}`;
+
+        // Release the previous beep player before creating the next one
+        if (soundRef.current) {
+          try {
+            soundRef.current.remove();
+          } catch {
+            // Ignore teardown errors
           }
-          base64 = btoa(binary);
-          const dataUri = `data:audio/wav;base64,${base64}`;
-          
-          // Play using expo-av
-          if (soundRef.current) {
-            try {
-              await soundRef.current.unloadAsync();
-            } catch (e) {
-              // Ignore unload errors
-            }
-          }
-          
-          const { sound } = await Audio.Sound.createAsync(
-            { uri: dataUri },
-            { shouldPlay: true, volume: 0.7 }
-          );
-          soundRef.current = sound;
-          
-          sound.setOnPlaybackStatusUpdate((status) => {
-            if (status.isLoaded && status.didJustFinish) {
-              sound.unloadAsync().catch(() => {});
-            }
-          });
-        } else {
-          // For native platforms without btoa, use a simpler approach
-          // Try to use expo-av's notification sound or just skip audio
-          // Haptics will still provide feedback
-          console.log('Audio encoding not available on this platform, using haptics only');
+          soundRef.current = null;
         }
+
+        const player = createAudioPlayer({ uri: dataUri });
+        player.volume = 0.7;
+        player.play();
+        soundRef.current = player;
       } catch (nativeError) {
         // If audio generation fails, that's okay - haptics will still work
         console.log('Audio generation failed:', nativeError);

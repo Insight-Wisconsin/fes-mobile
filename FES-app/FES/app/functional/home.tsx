@@ -1,4 +1,4 @@
-import { StyleSheet, View, TouchableOpacity, ScrollView, Animated, PanResponder, Dimensions, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView, Animated, PanResponder, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -102,6 +102,7 @@ const AnimatedIcon = ({ menuVisible }: { menuVisible: boolean }) => {
 };
 
 const BLE_STATUS_COLORS: Record<string, { bg: string; dot: string; text: string }> = {
+  unavailable:  { bg: '#F2F2F7', dot: '#C7C7CC', text: '#8E8E93' },
   disconnected: { bg: '#F2F2F7', dot: '#8E8E93', text: '#8E8E93' },
   scanning:     { bg: '#FFF8E1', dot: '#FF9500', text: '#FF9500' },
   connecting:   { bg: '#FFF8E1', dot: '#FF9500', text: '#FF9500' },
@@ -145,6 +146,16 @@ export default function HomeScreen() {
       <TouchableOpacity
         style={[styles.bleBanner, { backgroundColor: bleColors.bg }]}
         onPress={() => {
+          if (!ble.isSupported) {
+            Alert.alert(
+              'Bluetooth unavailable',
+              'Expo Go does not include the Bluetooth module, so the FES device cannot be reached. ' +
+                'Every other part of the app works here.\n\n' +
+                'To connect real hardware, run a development build:\n' +
+                'npm run android (or npm run ios)',
+            );
+            return;
+          }
           if (ble.isConnected) {
             ble.disconnect();
           } else if (!isWorking) {
@@ -171,7 +182,13 @@ export default function HomeScreen() {
           </ThemedText>
         </View>
         <ThemedText style={[styles.bleActionText, { color: bleColors.text }]}>
-          {ble.isConnected ? 'Disconnect' : isWorking ? '' : 'Connect'}
+          {!ble.isSupported
+            ? 'Details'
+            : ble.isConnected
+              ? 'Disconnect'
+              : isWorking
+                ? ''
+                : 'Connect'}
         </ThemedText>
       </TouchableOpacity>
 

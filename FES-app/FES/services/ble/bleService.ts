@@ -1,5 +1,5 @@
 import { BleManager, Device, Characteristic, State } from 'react-native-ble-plx';
-import { Platform, PermissionsAndroid } from 'react-native';
+import { Platform, PermissionsAndroid, NativeModules } from 'react-native';
 import { Buffer } from 'buffer';
 
 const ESP32_DEVICE_NAME = 'Divij_ESP32';
@@ -11,7 +11,32 @@ const CMD_START_STIM = 0x02;
 const CMD_STOP_STIM = 0x03;
 const CMD_PING = 0x04;
 
+/**
+ * react-native-ble-plx ships a native module that Expo Go does not contain.
+ * Its JS entry point is side-effect free, but `new BleManager()` dereferences
+ * `NativeModules.BlePlx` (see react-native-ble-plx/src/BleModule.js), so
+ * constructing it inside Expo Go throws and takes the whole app down.
+ *
+ * Probing the same native module the library uses lets the app boot anywhere:
+ * Expo Go and web get an inert service, development builds get real Bluetooth.
+ */
+export const isBLESupported: boolean = (() => {
+  try {
+    return NativeModules.BlePlx != null;
+  } catch {
+    // Legacy-bridge builds expose native modules through a lazy getter that
+    // can throw instead of returning undefined.
+    return false;
+  }
+})();
+
+export const BLE_UNAVAILABLE_MESSAGE =
+  Platform.OS === 'web'
+    ? 'Bluetooth is not supported in the browser'
+    : 'Bluetooth needs a development build';
+
 export type BLEConnectionState =
+  | 'unavailable'
   | 'disconnected'
   | 'scanning'
   | 'connecting'
@@ -21,15 +46,34 @@ export type BLEConnectionState =
 export type BLEEventCallback = (state: BLEConnectionState, message?: string) => void;
 
 class BLEService {
-  private manager: BleManager;
+  private manager: BleManager | null = null;
   private device: Device | null = null;
   private characteristic: Characteristic | null = null;
   private onStateChange: BLEEventCallback | null = null;
-  private connectionState: BLEConnectionState = 'disconnected';
+  private connectionState: BLEConnectionState = isBLESupported ? 'disconnected' : 'unavailable';
   private isDestroyed = false;
 
-  constructor() {
-    this.manager = new BleManager();
+  /**
+   * Builds the BleManager on first use, so that merely importing this module
+   * stays safe on platforms that have no native BLE module.
+   */
+  private getManager(): BleManager | null {
+    if (!isBLESupported || this.isDestroyed) return null;
+
+    if (this.manager === null) {
+      try {
+        this.manager = new BleManager();
+      } catch (err: any) {
+        console.warn('[BLE] Could not initialise BleManager:', err?.message ?? err);
+        return null;
+      }
+    }
+
+    return this.manager;
+  }
+
+  isSupported(): boolean {
+    return isBLESupported;
   }
 
   setStateCallback(callback: BLEEventCallback) {
@@ -67,8 +111,8 @@ class BLEService {
     }
   }
 
-  private async waitForPoweredOn(): Promise<void> {
-    const state = await this.manager.state();
+  private async waitForPoweredOn(manager: BleManager): Promise<void> {
+    const state = await manager.state();
     if (state === State.PoweredOn) return;
 
     return new Promise((resolve, reject) => {
@@ -77,7 +121,7 @@ class BLEService {
         reject(new Error('Bluetooth did not power on in time. Check that Bluetooth is enabled.'));
       }, 10000);
 
-      const subscription = this.manager.onStateChange((newState) => {
+      const subscription = manager.onStateChange((newState) => {
         if (newState === State.PoweredOn) {
           clearTimeout(timeout);
           subscription.remove();
@@ -90,6 +134,12 @@ class BLEService {
   async scanAndConnect(): Promise<void> {
     if (this.isDestroyed) return;
 
+    const manager = this.getManager();
+    if (manager === null) {
+      this.updateState('unavailable', BLE_UNAVAILABLE_MESSAGE);
+      return;
+    }
+
     const hasPermissions = await this.requestAndroidPermissions();
     if (!hasPermissions) {
       this.updateState('error', 'Bluetooth permissions not granted');
@@ -97,7 +147,7 @@ class BLEService {
     }
 
     try {
-      await this.waitForPoweredOn();
+      await this.waitForPoweredOn(manager);
     } catch (err: any) {
       this.updateState('error', err.message);
       return;
@@ -107,14 +157,14 @@ class BLEService {
 
     return new Promise((resolve, reject) => {
       const scanTimeout = setTimeout(() => {
-        this.manager.stopDeviceScan();
+        manager.stopDeviceScan();
         this.updateState('error', 'Device not found. Make sure the ESP32 is powered on.');
         reject(new Error('Scan timeout'));
       }, 15000);
 
-      this.manager.startDeviceScan(null, null, async (error, scannedDevice) => {
+      manager.startDeviceScan(null, null, async (error, scannedDevice) => {
         if (this.isDestroyed) {
-          this.manager.stopDeviceScan();
+          manager.stopDeviceScan();
           clearTimeout(scanTimeout);
           return;
         }
@@ -128,7 +178,7 @@ class BLEService {
 
         if (scannedDevice?.name === ESP32_DEVICE_NAME || scannedDevice?.localName === ESP32_DEVICE_NAME) {
           clearTimeout(scanTimeout);
-          this.manager.stopDeviceScan();
+          manager.stopDeviceScan();
 
           try {
             await this.connectToDevice(scannedDevice);
@@ -180,6 +230,10 @@ class BLEService {
   }
 
   private async writeCommand(command: number, value: number): Promise<void> {
+    if (!isBLESupported) {
+      throw new Error(BLE_UNAVAILABLE_MESSAGE);
+    }
+
     if (!this.characteristic || !this.device) {
       throw new Error('Not connected to device');
     }
@@ -217,13 +271,17 @@ class BLEService {
     }
     this.device = null;
     this.characteristic = null;
-    this.updateState('disconnected');
+    this.updateState(isBLESupported ? 'disconnected' : 'unavailable');
   }
 
   destroy() {
     this.isDestroyed = true;
     this.disconnect();
-    this.manager.destroy();
+
+    if (this.manager !== null) {
+      this.manager.destroy();
+      this.manager = null;
+    }
   }
 }
 

@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { Alert } from 'react-native';
-import { bleService, BLEConnectionState } from '../services/ble/bleService';
+import {
+  bleService,
+  BLEConnectionState,
+  BLE_UNAVAILABLE_MESSAGE,
+  isBLESupported,
+} from '../services/ble/bleService';
 
 interface BLEContextType {
   connectionState: BLEConnectionState;
@@ -12,13 +17,20 @@ interface BLEContextType {
   stopStimulation: () => Promise<void>;
   ping: () => Promise<void>;
   isConnected: boolean;
+  /** False in Expo Go and on web, where the BLE native module is missing. */
+  isSupported: boolean;
 }
 
 const BLEContext = createContext<BLEContextType | undefined>(undefined);
 
 export const BLEProvider = ({ children }: { children: ReactNode }) => {
-  const [connectionState, setConnectionState] = useState<BLEConnectionState>('disconnected');
-  const [statusMessage, setStatusMessage] = useState('Not connected');
+  // Seed from the service so Expo Go starts out reporting 'unavailable'
+  const [connectionState, setConnectionState] = useState<BLEConnectionState>(
+    bleService.getConnectionState()
+  );
+  const [statusMessage, setStatusMessage] = useState(
+    isBLESupported ? 'Not connected' : BLE_UNAVAILABLE_MESSAGE
+  );
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -87,6 +99,7 @@ export const BLEProvider = ({ children }: { children: ReactNode }) => {
     stopStimulation,
     ping,
     isConnected: connectionState === 'connected',
+    isSupported: isBLESupported,
   };
 
   return <BLEContext.Provider value={value}>{children}</BLEContext.Provider>;
@@ -102,6 +115,7 @@ export const useBLE = () => {
 
 function stateToMessage(state: BLEConnectionState): string {
   switch (state) {
+    case 'unavailable': return BLE_UNAVAILABLE_MESSAGE;
     case 'disconnected': return 'Not connected';
     case 'scanning': return 'Scanning...';
     case 'connecting': return 'Connecting...';
