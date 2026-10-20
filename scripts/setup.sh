@@ -3,13 +3,12 @@
 # FESMobile setup script (macOS / Linux / Git Bash on Windows).
 #
 # Verifies the tools that must be installed by hand, then installs the npm
-# dependencies for the Expo app in FES-app/FES.
+# dependencies for the Expo app.
 #
 # Usage:  bash scripts/setup.sh
 #
 set -uo pipefail
 
-APP_DIR="FES-app/FES"
 MISSING=0
 
 # ---------- pretty output -------------------------------------------------
@@ -102,14 +101,16 @@ if [ "$MISSING" -gt 0 ]; then
 fi
 
 # ---------- 4. install dependencies --------------------------------------
-if [ ! -d "$APP_DIR" ]; then
-  printf "\n%s==> Could not find %s%s\n" "$RED" "$APP_DIR" "$RESET"
-  printf "Run this script from inside a clone of the FESMobile repository.\n"
+if [ ! -f "package.json" ]; then
+  printf "
+%s==> No package.json found in %s%s
+" "$RED" "$REPO_ROOT" "$RESET"
+  printf "Run this script from inside a clone of the FESMobile repository.
+"
   exit 1
 fi
 
-head2 "Installing npm dependencies in $APP_DIR"
-cd "$APP_DIR" || exit 1
+head2 "Installing npm dependencies"
 
 if [ -f package-lock.json ]; then
   # npm ci is reproducible, but fails if the lockfile drifts from package.json.
@@ -150,7 +151,6 @@ One more thing to install BY HAND, on your phone:
 
 Then start the app:
 
-  cd FES-app/FES
   npx expo login     # sign in first -- Expo Go needs this
   npm start
 

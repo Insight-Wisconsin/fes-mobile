@@ -208,3 +208,21 @@ ehthumbs.db
 Thumbs.db
 
 # Other
+# Expo generated types
+expo-env.d.ts
+
+# Metro
+.metro-health-check*
+
+# Native build artifacts
+.kotlin/
+
+# create-expo-app scratch output
+app-example
+
+# Generated native projects (expo prebuild)
+/ios
+/android
+
+# Certificates
+*.pem

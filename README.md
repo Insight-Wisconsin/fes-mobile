@@ -105,7 +105,6 @@ powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 Then sign in to Expo and start the dev server:
 
 ```bash
-cd FES-app/FES
 npx expo login     # only needed once per machine
 npm start
 ```
@@ -129,7 +128,6 @@ If you would rather not use the script:
 node -v
 
 # 2. Install dependencies (note: the app lives in a subfolder)
-cd FES-app/FES
 npm ci
 
 # 3. Check the project is healthy
@@ -141,11 +139,6 @@ npx expo login
 # 5. Start it
 npm start
 ```
-
-> **Heads up:** the app is in **`FES-app/FES`**, not the repository root. The root still holds some
-> leftover scaffolding from an older bare React Native setup (`App.tsx`, `src/`, `index.js`,
-> `package.json`). Those files are not part of the build — always run npm commands from
-> `FES-app/FES`.
 
 ---
 
@@ -159,6 +152,7 @@ Expo Go is the fastest way to develop and is all you need for most work.
 | Navigation, all screens | ✅ | |
 | Calibration flow | ✅ | |
 | Gyroscope / foot-angle detection | ✅ | Uses the phone's real sensors |
+| Real-time sensor readouts | ✅ | Open it from the side menu |
 | Session beep + haptics | ✅ | |
 | **Bluetooth / ESP32 stimulator** | ❌ | Needs a development build |
 
@@ -182,7 +176,6 @@ compiled with the Bluetooth module included. This is a one-time setup per device
 Requires Android Studio and either a USB-connected phone with USB debugging enabled, or an emulator.
 
 ```bash
-cd FES-app/FES
 npm run android
 ```
 
@@ -191,7 +184,6 @@ npm run android
 Requires a Mac with Xcode.
 
 ```bash
-cd FES-app/FES
 npm run ios
 ```
 
@@ -200,7 +192,6 @@ npm run ios
 ```bash
 npm install -g eas-cli
 eas login
-cd FES-app/FES
 eas build --profile development --platform android
 ```
 
@@ -217,13 +208,13 @@ npm run start:dev-client
 - On Android the app requests Bluetooth and location permissions on first connect; Android requires
   location access for BLE scanning.
 - Device name, service UUID, and the command bytes live in
-  [`FES-app/FES/services/ble/bleService.ts`](FES-app/FES/services/ble/bleService.ts).
+  [`services/ble/bleService.ts`](services/ble/bleService.ts).
 
 ---
 
 ## Available commands
 
-Run these from `FES-app/FES`.
+Run these from the repository root.
 
 | Command | What it does |
 |---|---|
@@ -246,32 +237,38 @@ Run these from `FES-app/FES`.
 
 ```
 fesmobile/
-├── scripts/
-│   ├── setup.sh              # Setup for macOS / Linux / Git Bash
-│   └── setup.ps1             # Setup for Windows PowerShell
+├── app/                      # Screens; file-based routing (expo-router)
+│   ├── _layout.tsx           # Root layout; wraps the app in Auth + BLE providers
+│   ├── index.tsx             # Entry route, redirects to the home screen
+│   ├── (auth)/               # login, signup
+│   └── functional/           # home, calibration, session, real-time-data, settings
 │
-└── FES-app/FES/              # <-- the actual Expo app
-    ├── app/                  # Screens; file-based routing (expo-router)
-    │   ├── _layout.tsx       # Root layout; wraps the app in Auth + BLE providers
-    │   ├── index.tsx         # Entry route
-    │   ├── (auth)/           # Login and signup
-    │   ├── (tabs)/           # Tabbed section
-    │   └── functional/       # Home, calibration, session, settings
-    │
-    ├── components/           # Reusable UI (themed text/view, side menu, icons)
-    ├── constants/            # Theme and colour tokens
-    ├── contexts/             # AuthContext, BLEContext (app-wide state)
-    ├── hooks/                # Colour scheme and theme hooks
-    ├── services/
-    │   ├── ble/              # Bluetooth: scanning, connecting, sending commands
-    │   └── backend/          # Calibration storage
-    ├── assets/               # Icons and images
-    ├── app.json              # Expo configuration and permissions
-    └── package.json
+├── components/               # Reusable UI (themed text/view, side menu)
+├── constants/                # Theme and colour tokens
+├── contexts/                 # AuthContext, BLEContext (app-wide state)
+├── hooks/                    # Colour scheme and theme hooks
+├── services/
+│   ├── ble/                  # Bluetooth: scanning, connecting, sending commands
+│   └── backend/              # Calibration storage
+│
+├── assets/images/            # App icon and splash screen
+├── scripts/                  # setup.sh / setup.ps1 for new contributors
+├── app.json                  # Expo configuration and permissions
+└── package.json
 ```
 
-Routing is file-based: a file in `app/` becomes a route. `app/functional/home.tsx` is the main
-screen after login.
+Routing is file-based: a file in `app/` becomes a route, and the folder name becomes the URL
+segment. `app/functional/home.tsx` is the main screen after login. The current routes are:
+
+| Route | Screen |
+|---|---|
+| `/` | Redirects to `/functional/home` |
+| `/login`, `/signup` | Authentication |
+| `/functional/home` | Main screen: BLE status, intensity dial, session shortcuts |
+| `/functional/calibration` | Per-user calibration flow |
+| `/functional/session` | Live gait session with impulse triggering |
+| `/functional/real-time-data` | Raw gyroscope / accelerometer readouts (debug) |
+| `/functional/settings` | Settings |
 
 ### Tech stack
 
@@ -289,11 +286,10 @@ screen after login.
 ### A note on authentication
 
 Accounts are currently stored **on the device** with `AsyncStorage`
-([`contexts/AuthContext.tsx`](FES-app/FES/contexts/AuthContext.tsx)). There is no backend, and
+([`contexts/AuthContext.tsx`](contexts/AuthContext.tsx)). There is no backend, and
 passwords are not hashed — fine for development, not for real users.
 
-A Firebase version is kept as a reference at `services/authService.ts.example`. It is not wired up
-and not compiled; the `firebase` package is not installed.
+Moving auth to a real backend is still open work.
 
 ---
 
@@ -323,7 +319,6 @@ npm run start:tunnel
 Clear the bundler cache and reinstall:
 
 ```bash
-cd FES-app/FES
 npm run start:clear
 ```
 
@@ -377,7 +372,6 @@ git push origin feature/your-feature-name
 Before pushing, please run:
 
 ```bash
-cd FES-app/FES
 npm run typecheck
 ```
 

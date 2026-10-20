@@ -122,8 +122,20 @@ export function SideMenu({ visible, onClose }: SideMenuProps) {
             <View style={styles.divider} />
 
             {/* Menu Items */}
-            <TouchableOpacity 
-              style={styles.menuItem} 
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                onClose();
+                router.push('/functional/real-time-data' as any);
+              }}
+            >
+              <Ionicons name="pulse-outline" size={24} color="#000" />
+              <ThemedText style={styles.menuItemText}>Real-Time Data</ThemedText>
+              <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
               onPress={() => {
                 onClose();
                 router.push('/functional/settings' as any);

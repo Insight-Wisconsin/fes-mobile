@@ -1,11 +1,10 @@
 # FESMobile setup script (Windows PowerShell).
 #
 # Verifies the tools that must be installed by hand, then installs the npm
-# dependencies for the Expo app in FES-app\FES.
+# dependencies for the Expo app.
 #
 # Usage:  powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 
-$AppDir  = 'FES-app\FES'
 $Missing = 0
 
 function Write-Ok   { param($m) Write-Host "  [ok]      $m" -ForegroundColor Green }
@@ -103,15 +102,14 @@ if ($Missing -gt 0) {
 }
 
 # ---------- 4. install dependencies --------------------------------------
-if (-not (Test-Path $AppDir)) {
+if (-not (Test-Path 'package.json')) {
     Write-Host ''
-    Write-Host "==> Could not find $AppDir" -ForegroundColor Red
+    Write-Host "==> No package.json found in $RepoRoot" -ForegroundColor Red
     Write-Host 'Run this script from inside a clone of the FESMobile repository.'
     exit 1
 }
 
-Write-Head "Installing npm dependencies in $AppDir"
-Set-Location $AppDir
+Write-Head 'Installing npm dependencies'
 
 $installed = $false
 if (Test-Path 'package-lock.json') {
@@ -165,7 +163,6 @@ One more thing to install BY HAND, on your phone:
 
 Then start the app:
 
-  cd FES-app\FES
   npx expo login     # sign in first -- Expo Go needs this
   npm start
 

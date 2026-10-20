@@ -7,7 +7,7 @@ import { TouchableOpacity } from 'react-native';
 import { ThemedView } from '@/components/themed-view';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { calibrationService } from '../services/backend/calibration';
+import { calibrationService } from '../../services/backend/calibration';
 
 // Safe number formatter
 const formatNumber = (value: number | undefined | null): string => {
