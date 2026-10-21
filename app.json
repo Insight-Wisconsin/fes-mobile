@@ -10,11 +10,9 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSMotionUsageDescription": "This app uses motion sensors to detect foot movement for FES device control.",
-        "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to communicate with the FES stimulation device.",
-        "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to communicate with the FES stimulation device."
+        "NSMotionUsageDescription": "This app uses motion sensors to detect foot movement for FES device control."
       },
-      "bundleIdentifier": "com.divijkohli.FES"
+      "bundleIdentifier": "com.insightwisconsin.fes"
     },
     "android": {
       "adaptiveIcon": {
@@ -52,7 +50,14 @@
           }
         }
       ],
-      "react-native-ble-plx",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": [],
+          "bluetoothAlwaysPermission": "This app uses Bluetooth to communicate with the FES stimulation device."
+        }
+      ],
       "expo-font",
       "expo-image",
       "expo-status-bar",

@@ -111,9 +111,38 @@ class BLEService {
     }
   }
 
+  /**
+   * Resolves once Bluetooth is usable. States the user has to fix themselves
+   * fail immediately with an actionable message; only the transient
+   * Unknown/Resetting states wait for the timeout. On iPhone, tapping
+   * "Don't Allow" on the permission prompt lands in Unauthorized.
+   */
   private async waitForPoweredOn(manager: BleManager): Promise<void> {
+    const blockingError = (state: State): Error | null => {
+      switch (state) {
+        case State.Unauthorized:
+          return new Error(
+            Platform.OS === 'ios'
+              ? 'Bluetooth permission is off. Turn it on in Settings → FES → Bluetooth.'
+              : 'Bluetooth permission is off. Allow it in the app settings.'
+          );
+        case State.PoweredOff:
+          return new Error(
+            Platform.OS === 'ios'
+              ? 'Bluetooth is off. Turn it on in Control Center.'
+              : 'Bluetooth is off. Turn it on in your quick settings.'
+          );
+        case State.Unsupported:
+          return new Error('This device does not support Bluetooth Low Energy.');
+        default:
+          return null;
+      }
+    };
+
     const state = await manager.state();
     if (state === State.PoweredOn) return;
+    const immediate = blockingError(state);
+    if (immediate) throw immediate;
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -126,6 +155,13 @@ class BLEService {
           clearTimeout(timeout);
           subscription.remove();
           resolve();
+          return;
+        }
+        const error = blockingError(newState);
+        if (error) {
+          clearTimeout(timeout);
+          subscription.remove();
+          reject(error);
         }
       }, true);
     });

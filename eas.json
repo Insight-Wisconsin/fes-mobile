@@ -1,0 +1,20 @@
+{
+  "cli": {
+    "version": ">= 25.3.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "FES_IOS_BUNDLE_ID": "com.insightwisconsin.fes",
+        "FES_APPLE_TEAM_ID": ""
+      }
+    },
+    "preview": {
+      "extends": "development",
+      "developmentClient": false
+    }
+  }
+}
