@@ -81,17 +81,11 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
     Write-Host '            Download it: https://git-scm.com/downloads'
 }
 
-# ---------- 2. optional tools --------------------------------------------
-Write-Head 'Optional (only needed for native development builds)'
-
-if ($env:ANDROID_HOME -or $env:ANDROID_SDK_ROOT) {
-    Write-Ok 'Android SDK detected'
-} else {
-    Write-Note "Android SDK not detected. Only needed for 'npm run android'."
-    Write-Host '            Install Android Studio: https://developer.android.com/studio'
-}
-
-Write-Note 'iOS builds are not possible on Windows. Use Expo Go on an iPhone instead.'
+# ---------- 2. iPhone builds ---------------------------------------------
+Write-Head 'iPhone builds'
+Write-Note 'Building the FES app onto an iPhone needs Xcode, which only runs on macOS.'
+Write-Host '            You install it once from a Mac teammate (or the cloud, later),'
+Write-Host '            then develop from this PC. See the steps at the end.'
 
 # ---------- 3. stop if anything required is missing -----------------------
 if ($Missing -gt 0) {
@@ -135,42 +129,28 @@ if ($NpxExe) {
     if ($LASTEXITCODE -ne 0) { Write-Note 'expo-doctor reported issues (see above).' }
 }
 
-# ---------- 6. Expo account ----------------------------------------------
-Write-Head 'Checking your Expo account'
-$expoUser = $null
-if ($NpxExe) {
-    $expoUser = (& $NpxExe expo whoami 2>$null | Select-Object -Last 1)
-}
-if ($expoUser -and $expoUser -notmatch 'Not logged in') {
-    Write-Ok "signed in to Expo as $expoUser"
-} else {
-    Write-Note 'You are NOT signed in to Expo.'
-    Write-Host '            The project will not open in Expo Go until you sign in. Run:'
-    Write-Host '              npx expo login'
-    Write-Host '            No account yet? Create one free: https://expo.dev/signup'
-}
-
-# ---------- 7. next steps --------------------------------------------------
+# ---------- 6. next steps --------------------------------------------------
 @'
 
-==> Setup complete.
+==> Setup complete. You can edit and run the app from this PC.
 
-One more thing to install BY HAND, on your phone:
+The FES app gets onto your iPhone once (iPhone needs iOS 16.4 or newer):
 
-  Expo Go
-    iOS      https://apps.apple.com/app/expo-go/id982107779
-    Android  https://play.google.com/store/apps/details?id=host.exp.exponent
+  - Now:   plug your iPhone into a Mac teammate's Mac. They run:
+             npm run ios:device
+  - Later: once the team's paid/UW Apple account is set up, run from here:
+             npm run ios:register     (once per iPhone)
+             npm run ios:build
 
-Then start the app:
+After that, develop entirely from this PC:
 
-  npx expo login     # sign in first -- Expo Go needs this
-  npm start
+  npm start                then scan the QR code with the iPhone Camera app
 
-Scan the QR code with Expo Go (Android) or the Camera app (iOS).
-Sign in to Expo Go on your phone with the SAME account you used above.
-Your computer and your phone must be on the same Wi-Fi network.
-If the QR code will not connect, use:  npm run start:tunnel
+  - Windows Firewall: when asked about Node.js, allow it on Private networks.
+  - If the iPhone can't reach this PC (common on campus Wi-Fi):
+      npm run start:tunnel
 
-Note: Bluetooth / the ESP32 stimulator does not work in Expo Go.
-That needs a development build -- see the README.
+UI-only preview without Bluetooth, using the Expo Go app:
+  npx expo login       (once; sign in to Expo Go with the same account)
+  npm run start:go
 '@ | Write-Host

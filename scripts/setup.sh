@@ -3,13 +3,16 @@
 # FESMobile setup script (macOS / Linux / Git Bash on Windows).
 #
 # Verifies the tools that must be installed by hand, then installs the npm
-# dependencies for the Expo app.
+# dependencies. On a Mac it also checks the iPhone build toolchain (Xcode,
+# CocoaPods) and creates your personal .env.local.
 #
 # Usage:  bash scripts/setup.sh
 #
 set -uo pipefail
 
 MISSING=0
+IS_MAC=0
+[ "$(uname -s 2>/dev/null)" = "Darwin" ] && IS_MAC=1
 
 # ---------- pretty output -------------------------------------------------
 if [ -t 1 ]; then
@@ -68,28 +71,59 @@ else
   printf "           Download it: https://git-scm.com/downloads\n"
 fi
 
-# ---------- 2. optional tools --------------------------------------------
-head2 "Optional (only needed for native development builds)"
+# ---------- 2. iPhone build toolchain (macOS only) -------------------------
+if [ "$IS_MAC" -eq 1 ]; then
+  head2 "Checking the iPhone build toolchain"
 
-if command -v watchman > /dev/null 2>&1; then
-  ok "watchman $(watchman --version 2>/dev/null)"
-else
-  warn "watchman not found. Optional; speeds up file watching on macOS."
-fi
-
-if [ -n "${ANDROID_HOME:-}${ANDROID_SDK_ROOT:-}" ]; then
-  ok "Android SDK detected"
-else
-  warn "Android SDK not detected. Only needed for 'npm run android'."
-  printf "         Install Android Studio: https://developer.android.com/studio\n"
-fi
-
-if [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
-  if command -v xcodebuild > /dev/null 2>&1; then
-    ok "Xcode command line tools"
+  # --- Xcode ---
+  # `xcodebuild -version` fails when only the Command Line Tools are selected,
+  # or when the Xcode license has not been accepted yet.
+  # Expo SDK 57 requires Xcode 26.4+ (https://expo.fyi/expo-sdk-xcode-compatibility).
+  # Bump this together with the Expo SDK.
+  MIN_XCODE="26.4"
+  XCODE_APP="${XCODE_APP:-/Applications/Xcode.app}"
+  if XCODE_OUT="$(xcodebuild -version 2>&1)"; then
+    XCODE_VER="$(printf '%s' "$XCODE_OUT" | head -1 | sed -n 's/^Xcode \([0-9][0-9.]*\).*/\1/p')"
+    if ! command -v node > /dev/null 2>&1; then
+      ok "Xcode ${XCODE_VER:-installed} (version not checked: Node.js missing)"
+    elif [ -n "$XCODE_VER" ] && node -e '
+const [a, b] = process.argv.slice(1).map((s) => s.split(".").map(Number));
+for (let i = 0; i < 3; i++) { const x = a[i] || 0, y = b[i] || 0; if (x !== y) process.exit(x > y ? 0 : 1); }
+' "$XCODE_VER" "$MIN_XCODE" 2>/dev/null; then
+      ok "Xcode $XCODE_VER"
+    else
+      fail "Xcode ${XCODE_VER:-(unknown version)} is too old. This Expo SDK needs Xcode $MIN_XCODE or newer."
+      printf "           Update it from the Mac App Store (macOS may need updating first).\n"
+    fi
+  elif printf '%s' "$XCODE_OUT" | grep -qi "license"; then
+    fail "The Xcode license has not been accepted."
+    printf "           Run:  sudo xcodebuild -license accept\n"
+  elif [ -d "$XCODE_APP" ]; then
+    fail "Xcode is installed but not selected (only the Command Line Tools are active)."
+    printf "           Run:  sudo xcode-select -s %s/Contents/Developer\n" "$XCODE_APP"
   else
-    warn "Xcode not found. Only needed for 'npm run ios'."
-    printf "         Install Xcode from the Mac App Store.\n"
+    fail "Xcode is not installed."
+    printf "           Install it from the Mac App Store, open it once, then rerun:\n"
+    printf "           https://apps.apple.com/app/xcode/id497799835\n"
+  fi
+
+  # --- CocoaPods ---
+  if command -v pod > /dev/null 2>&1; then
+    ok "CocoaPods $(pod --version 2>/dev/null)"
+  else
+    fail "CocoaPods is not installed (it installs the iOS native libraries)."
+    if command -v brew > /dev/null 2>&1; then
+      printf "           Run:  brew install cocoapods\n"
+    else
+      printf "           Install Homebrew from https://brew.sh, then run:  brew install cocoapods\n"
+    fi
+  fi
+
+  # --- Watchman (optional) ---
+  if command -v watchman > /dev/null 2>&1; then
+    ok "watchman $(watchman --version 2>/dev/null)"
+  else
+    warn "watchman not found. Optional; speeds up file watching.  brew install watchman"
   fi
 fi
 
@@ -102,11 +136,8 @@ fi
 
 # ---------- 4. install dependencies --------------------------------------
 if [ ! -f "package.json" ]; then
-  printf "
-%s==> No package.json found in %s%s
-" "$RED" "$REPO_ROOT" "$RESET"
-  printf "Run this script from inside a clone of the FESMobile repository.
-"
+  printf "\n%s==> No package.json found in %s%s\n" "$RED" "$REPO_ROOT" "$RESET"
+  printf "Run this script from inside a clone of the FESMobile repository.\n"
   exit 1
 fi
 
@@ -126,39 +157,65 @@ fi
 head2 "Verifying the project"
 npx expo-doctor || warn "expo-doctor reported issues (see above)."
 
-# ---------- 6. Expo account ----------------------------------------------
-head2 "Checking your Expo account"
-EXPO_USER="$(npx expo whoami 2>/dev/null | tail -1)"
-if [ -n "$EXPO_USER" ] && [ "${EXPO_USER#*Not logged in}" = "$EXPO_USER" ]; then
-  ok "signed in to Expo as $EXPO_USER"
-else
-  warn "You are NOT signed in to Expo."
-  printf "         The project will not open in Expo Go until you sign in. Run:\n"
-  printf "           %snpx expo login%s\n" "$BOLD" "$RESET"
-  printf "         No account yet? Create one free: https://expo.dev/signup\n"
+# ---------- 6. personal iOS bundle ID (macOS only) -------------------------
+if [ "$IS_MAC" -eq 1 ]; then
+  head2 "Your personal iOS settings (.env.local)"
+  if [ -f .env.local ] && grep -q "^FES_IOS_BUNDLE_ID=" .env.local; then
+    ok "already set: $(grep '^FES_IOS_BUNDLE_ID=' .env.local | head -1)"
+  else
+    # Free Apple IDs can't share a bundle ID, so each Mac gets its own.
+    SUFFIX="$(whoami | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-z0-9-]/-/g' -e 's/^-*//' -e 's/-*$//')"
+    [ -z "$SUFFIX" ] && SUFFIX="dev"
+    BUNDLE_ID="com.insightwisconsin.fes.$SUFFIX"
+    {
+      printf "# Created by scripts/setup.sh -- personal, never committed (see .env.example).\n"
+      printf "FES_IOS_BUNDLE_ID=%s\n" "$BUNDLE_ID"
+    } >> .env.local
+    ok "created .env.local with FES_IOS_BUNDLE_ID=$BUNDLE_ID"
+  fi
 fi
 
 # ---------- 7. next steps --------------------------------------------------
-cat <<'EOF'
+if [ "$IS_MAC" -eq 1 ]; then
+  cat <<'EOF'
 
-==> Setup complete.
+==> Setup complete. Put the FES app on your iPhone (needs iOS 16.4 or newer):
 
-One more thing to install BY HAND, on your phone:
+  1. Xcode > Settings > Accounts > "+" > add your Apple ID (a free one works).
+  2. Plug your iPhone into this Mac with a cable. Unlock it and tap "Trust".
+  3. Run:   npm run ios:device      (pick your iPhone; first build ~5-15 min)
+  4. On the iPhone, if iOS refuses to open FES:
+       - Settings > Privacy & Security > Developer Mode > On (then restart)
+       - Free Apple ID: Settings > General > VPN & Device Management > trust yourself
+  5. When FES asks for "Local Network" access, tap Allow.
 
-  Expo Go
-    iOS      https://apps.apple.com/app/expo-go/id982107779
-    Android  https://play.google.com/store/apps/details?id=host.exp.exponent
+Every day after that:   npm start   then open FES on your iPhone.
+Rebuild (step 3) only after native changes -- or every 7 days on a free Apple ID.
 
-Then start the app:
-
-  npx expo login     # sign in first -- Expo Go needs this
-  npm start
-
-Scan the QR code with Expo Go (Android) or the Camera app (iOS).
-Sign in to Expo Go on your phone with the SAME account you used above.
-Your computer and your phone must be on the same Wi-Fi network.
-If the QR code will not connect, use:  npm run start:tunnel
-
-Note: Bluetooth / the ESP32 stimulator does not work in Expo Go.
-That needs a development build -- see the README.
+Teammate on Windows? Plug their iPhone into this Mac and run step 3 for them.
 EOF
+else
+  cat <<'EOF'
+
+==> Setup complete. You can edit and run the app from this computer.
+
+Building the FES app onto an iPhone needs Xcode, which only runs on macOS.
+So the FES app gets onto your iPhone once (iOS 16.4 or newer), in one of two ways:
+
+  - Now:   plug your iPhone into a Mac teammate's Mac. They run:
+             npm run ios:device
+  - Later: once the team's paid/UW Apple account is set up, run from here:
+             npm run ios:register     (once per iPhone)
+             npm run ios:build
+
+After that, develop entirely from this computer:
+
+  npm start                then scan the QR code with the iPhone Camera app
+
+  - Windows Firewall: when asked about Node.js, allow it on Private networks.
+  - If the iPhone can't reach this computer (common on campus Wi-Fi):
+      npm run start:tunnel
+
+UI-only preview without Bluetooth, using the Expo Go app:   npm run start:go
+EOF
+fi

@@ -11,11 +11,12 @@ Built with React Native and Expo. Developed by **Insight Wisconsin – UW–Madi
 
 ## Contents
 
+- [How this works (read this first)](#how-this-works-read-this-first)
 - [Before you start: what to install](#before-you-start-what-to-install)
-- [Quick start](#quick-start)
-- [Manual setup](#manual-setup)
-- [What works in Expo Go](#what-works-in-expo-go)
-- [Running on real FES hardware](#running-on-real-fes-hardware)
+- [Setup](#setup)
+- [Get the FES app on your iPhone](#get-the-fes-app-on-your-iphone)
+- [Daily development](#daily-development)
+- [Connecting to the ESP32](#connecting-to-the-esp32)
 - [Available commands](#available-commands)
 - [Project layout](#project-layout)
 - [Troubleshooting](#troubleshooting)
@@ -23,192 +24,167 @@ Built with React Native and Expo. Developed by **Insight Wisconsin – UW–Madi
 
 ---
 
+## How this works (read this first)
+
+The app talks to the ESP32 over Bluetooth, and **Expo Go can't do Bluetooth**. Expo Go only
+contains Expo's own native code, and our Bluetooth library isn't part of it.
+
+So instead of Expo Go, each iPhone gets our own **FES app**, a "development build". It works just
+like Expo Go: you run `npm start` on your computer, open FES on the phone, and your code loads
+over Wi-Fi with live reload. The difference is that Bluetooth is built in.
+
+- The FES app is **installed once per iPhone**. Building it needs **Xcode, which only runs on a Mac**.
+- After that, **day-to-day development works from a Mac or a Windows PC.** The phone just loads
+  your code from whichever computer runs `npm start`.
+
+| | Mac | Windows |
+|---|---|---|
+| Edit code, run the app, test Bluetooth with the ESP32 | ✅ | ✅ |
+| Install the FES app on your own iPhone | ✅ `npm run ios:device` | Plug your iPhone into a teammate's Mac, or use a [cloud build](#windows-later-cloud-build-from-your-pc) once the team's paid Apple account exists |
+
+---
+
 ## Before you start: what to install
 
 The setup script installs the project's npm packages, but it **cannot install the programs below**.
-Download and install these yourself first. If any are missing, the setup script stops and tells you
-which one to get.
+If any are missing, it stops and tells you which one to get.
 
-### Required — on your computer
+### Everyone
 
 | Program | Version | Download |
 |---|---|---|
 | **Node.js** | 20.19.4+, 22.13+, 24.3+, or 25+ (LTS recommended) | <https://nodejs.org/en/download> |
 | **Git** | any recent version | <https://git-scm.com/downloads> |
+| **iPhone** | iOS 16.4 or newer | Settings → General → Software Update |
 
-`npm` ships with Node.js, so you do not install it separately.
+`npm` ships with Node.js. React Native 0.86 rejects older Node releases and the odd-numbered ones
+(21, 23).
 
-> **Node version matters.** React Native 0.86 rejects older releases and the odd-numbered ones
-> (21, 23). If `node -v` prints something outside the list above, install an LTS build.
+### Mac only (to build the FES app onto iPhones)
 
-### Required — on your phone
-
-| App | Download |
-|---|---|
-| **Expo Go** | iOS: <https://apps.apple.com/app/expo-go/id982107779> · Android: <https://play.google.com/store/apps/details?id=host.exp.exponent> |
-
-Your phone and your computer must be on **the same Wi-Fi network**.
-
-### Required — a free Expo account
-
-You need an Expo account, signed in **both on your computer and inside Expo Go**, or the project
-will not show up when you scan the QR code.
-
-1. Create a free account at <https://expo.dev/signup> (skip if you have one).
-2. Sign in on your computer:
-
-   ```bash
-   npx expo login
-   ```
-
-3. Open Expo Go on your phone and sign in with **the same account**.
-
-To check who you are signed in as, run `npx expo whoami`.
-
-### Optional — only for native development builds
-
-You do **not** need these to run the app in Expo Go. You need them only to talk to the real
-ESP32 stimulator (see [Running on real FES hardware](#running-on-real-fes-hardware)).
-
-| Program | Why | Download |
+| Program | Version | Download |
 |---|---|---|
-| **Android Studio** | builds the Android dev client; provides the Android SDK and emulator | <https://developer.android.com/studio> |
-| **Xcode** (macOS only) | builds the iOS dev client | Mac App Store |
-| **Watchman** (macOS) | faster file watching | <https://facebook.github.io/watchman/docs/install> |
-
-iOS builds require a Mac. On Windows and Linux, use Expo Go on an iPhone, or build for Android.
+| **Xcode** | **26.4 or newer** (required by Expo SDK 57) | [Mac App Store](https://apps.apple.com/app/xcode/id497799835). Open it once after installing. |
+| **CocoaPods** | any recent version | `brew install cocoapods` (Homebrew: <https://brew.sh>) |
+| **An Apple ID** | a free one works | <https://account.apple.com> |
+| Watchman *(optional)* | | `brew install watchman` |
 
 ---
 
-## Quick start
+## Setup
 
 ```bash
-git clone https://github.com/your-org-name/fesmobile.git
-cd fesmobile
+git clone https://github.com/Insight-Wisconsin/fes-mobile.git
+cd fes-mobile
 ```
 
-Then run the setup script for your platform. It checks your tools, installs the dependencies, and
-verifies the project.
-
-**macOS / Linux / Git Bash on Windows**
+**Mac / Linux / Git Bash:**
 
 ```bash
 bash scripts/setup.sh
 ```
 
-**Windows PowerShell**
+**Windows PowerShell:**
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 ```
 
-Then sign in to Expo and start the dev server:
-
-```bash
-npx expo login     # only needed once per machine
-npm start
-```
-
-A QR code appears in the terminal.
-
-- **Android** — open Expo Go and scan the QR code.
-- **iOS** — scan the QR code with the Camera app, then open the link in Expo Go.
-
-Make sure you are signed in to Expo Go on your phone with the same account. The app reloads
-automatically when you save a file.
+The script checks your tools, installs dependencies, and checks the project. **On a Mac** it also
+creates `.env.local` with your personal iOS bundle ID (see [why](#why-each-mac-has-its-own-bundle-id)).
 
 ---
 
-## Manual setup
+## Get the FES app on your iPhone
 
-If you would rather not use the script:
+You only do this once per iPhone. You'll also need to redo it after a *native* change (a new native
+library or a Bluetooth/permission setting) or, on a free Apple ID, every 7 days.
+
+### On a Mac
+
+1. **Xcode → Settings → Accounts → `+`** → sign in with your Apple ID (a free one works).
+2. **Plug the iPhone in with a cable**, unlock it, and tap **Trust This Computer**.
+3. Build and install:
+
+   ```bash
+   npm run ios:device
+   ```
+
+   Pick your iPhone from the list. The first build takes about 5–15 minutes; later ones are much
+   faster.
+4. **On the iPhone**, if iOS won't open FES:
+   - **Settings → Privacy & Security → Developer Mode → On**, then restart the phone.
+   - With a **free Apple ID**, also go to **Settings → General → VPN & Device Management**, tap
+     your Apple ID, and tap **Trust**.
+5. When FES asks to find devices on your **Local Network**, tap **Allow**. That's how it reaches
+   your computer.
+
+### Windows: now (via a teammate's Mac)
+
+Plug your iPhone into a Mac teammate's Mac and have them run `npm run ios:device`, picking
+**your** iPhone. That's it. From then on you develop from your PC (see
+[Daily development](#daily-development)). With free Apple IDs, the install expires after 7 days,
+so repeat this weekly.
+
+### Windows: later (cloud build from your PC)
+
+Once the team has a paid Apple Developer account (or one through UW), you won't need a Mac at all:
 
 ```bash
-# 1. Confirm your Node version is supported
-node -v
-
-# 2. Install dependencies (note: the app lives in a subfolder)
-npm ci
-
-# 3. Check the project is healthy
-npx expo-doctor
-
-# 4. Sign in to Expo (required for Expo Go)
-npx expo login
-
-# 5. Start it
-npm start
+npm run ios:register     # once per iPhone: open the link it prints on the iPhone
+npm run ios:build        # Expo builds the app in the cloud; open the install link on the iPhone
 ```
+
+Installs made this way last a year. The first-time setup (linking the Expo project and Apple
+credentials) is a one-off job for whoever manages the Apple account.
+
+### Why each Mac has its own bundle ID
+
+A free Apple ID can't reuse a bundle ID another person has already registered. So `setup.sh` gives
+each Mac its own ID in `.env.local` (for example `com.insightwisconsin.fes.alex`). `.env.local` is
+gitignored and never committed; see `.env.example`. Once everyone is on the shared paid Apple team,
+delete that line so everyone uses `com.insightwisconsin.fes`.
 
 ---
 
-## What works in Expo Go
+## Daily development
 
-Expo Go is the fastest way to develop and is all you need for most work.
+On a Mac **or** a Windows PC:
 
-| Feature | Expo Go | Notes |
+```bash
+npm start
+```
+
+Scan the QR code with the iPhone **Camera app**, or just open **FES**: it lists dev servers on your
+network. Saving a file reloads the app instantly. Plain JS/TS changes **never** need a rebuild.
+
+**Windows:** the first time, Windows Firewall asks about Node.js. Allow it on **Private** networks.
+
+**Quick UI preview without Bluetooth (no FES app needed):** `npm run start:go` opens the app in
+[Expo Go](https://apps.apple.com/app/expo-go/id982107779) instead. You must be signed in with
+`npx expo login` and in Expo Go with the same account. The Bluetooth banner will say *"Bluetooth
+needs a development build"*, which is expected.
+
+---
+
+## Connecting to the ESP32
+
+1. Power on the ESP32 (it advertises as **`Divij_ESP32`**).
+2. In FES, tap the Bluetooth banner on the home screen and allow Bluetooth when iOS asks.
+3. The banner goes *Scanning → Connecting → Connected*. The intensity dial then sends its value
+   to the ESP32 live.
+
+Every command is 2 bytes (`[command, value]`):
+
+| Byte 0 | Value | Effect |
 |---|---|---|
-| Login / signup | ✅ | Accounts are stored locally on the device |
-| Navigation, all screens | ✅ | |
-| Calibration flow | ✅ | |
-| Gyroscope / foot-angle detection | ✅ | Uses the phone's real sensors |
-| Real-time sensor readouts | ✅ | Open it from the side menu |
-| Session beep + haptics | ✅ | |
-| **Bluetooth / ESP32 stimulator** | ❌ | Needs a development build |
+| `0x01` | 0–10 | Set intensity |
+| `0x02` | — | Start stimulation |
+| `0x03` | — | Stop stimulation |
+| `0x04` | — | Ping |
 
-**Why Bluetooth does not work in Expo Go.** Expo Go is a prebuilt app, so it only contains the
-native modules Expo ships with it. `react-native-ble-plx` is not one of them, so the Bluetooth
-native module is simply absent.
-
-The app detects this at startup and degrades gracefully instead of crashing: the Bluetooth banner
-on the home screen reads *"Bluetooth needs a development build"*, and tapping it explains why.
-Everything else runs normally.
-
----
-
-## Running on real FES hardware
-
-To connect to the ESP32 stimulator you need a **development build** — your own copy of the app,
-compiled with the Bluetooth module included. This is a one-time setup per device.
-
-### Android
-
-Requires Android Studio and either a USB-connected phone with USB debugging enabled, or an emulator.
-
-```bash
-npm run android
-```
-
-### iOS
-
-Requires a Mac with Xcode.
-
-```bash
-npm run ios
-```
-
-### No Android Studio or Xcode? Build in the cloud
-
-```bash
-npm install -g eas-cli
-eas login
-eas build --profile development --platform android
-```
-
-Install the resulting build on your phone, then start the dev server for it:
-
-```bash
-npm run start:dev-client
-```
-
-### Hardware notes
-
-- The app scans for a BLE device advertising the name **`Divij_ESP32`**.
-- Make sure the ESP32 is powered on and Bluetooth is enabled on the phone.
-- On Android the app requests Bluetooth and location permissions on first connect; Android requires
-  location access for BLE scanning.
-- Device name, service UUID, and the command bytes live in
-  [`services/ble/bleService.ts`](services/ble/bleService.ts).
+The device name, service/characteristic UUIDs and command bytes live in
+[`services/ble/bleService.ts`](services/ble/bleService.ts).
 
 ---
 
@@ -218,15 +194,15 @@ Run these from the repository root.
 
 | Command | What it does |
 |---|---|
-| `npx expo login` | Sign in to Expo — required before Expo Go will open the project |
-| `npx expo whoami` | Show which Expo account you are signed in as |
-| `npm start` | Start the dev server for **Expo Go** |
+| `npm start` | Dev server for the **FES app** (the everyday command) |
 | `npm run start:clear` | Same, clearing the bundler cache (fixes most stale-cache bugs) |
-| `npm run start:tunnel` | Same, routed through a tunnel — use when Wi-Fi blocks the QR connection |
-| `npm run start:dev-client` | Start the dev server for a **development build** |
-| `npm run android` | Build and install the Android development build |
-| `npm run ios` | Build and install the iOS development build (macOS only) |
-| `npm run web` | Open the app in a browser |
+| `npm run start:tunnel` | Same, through a tunnel, for when campus Wi-Fi blocks phone ↔ computer traffic |
+| `npm run start:go` | Dev server for **Expo Go** (UI preview, no Bluetooth) |
+| `npm run ios:device` | **Mac:** build and install the FES app on a USB-connected iPhone |
+| `npm run ios` | **Mac:** run in the iOS Simulator (UI only; the Simulator has no Bluetooth) |
+| `npm run ios:register` | Cloud builds: register an iPhone (needs the team's paid Apple account) |
+| `npm run ios:build` | Cloud builds: build the FES app on Expo's servers (needs the team's paid Apple account) |
+| `npm run web` | Open the app in a browser (no Bluetooth) |
 | `npm run typecheck` | Run TypeScript with no emit |
 | `npm run lint` | Run ESLint |
 | `npm run doctor` | Check the project for dependency and config problems |
@@ -254,6 +230,9 @@ fesmobile/
 ├── assets/images/            # App icon and splash screen
 ├── scripts/                  # setup.sh / setup.ps1 for new contributors
 ├── app.json                  # Expo configuration and permissions
+├── app.config.js             # Per-developer iOS overrides, read from .env.local
+├── .env.example              # Documents the .env.local variables
+├── eas.json                  # Cloud build profiles (for the paid Apple account)
 └── package.json
 ```
 
@@ -269,6 +248,9 @@ segment. `app/functional/home.tsx` is the main screen after login. The current r
 | `/functional/session` | Live gait session with impulse triggering |
 | `/functional/real-time-data` | Raw gyroscope / accelerometer readouts (debug) |
 | `/functional/settings` | Settings |
+
+The iOS folder is **generated**, not committed: `npm run ios:device` creates `ios/` from
+`app.json` each time it's needed, so there are no native-project merge conflicts.
 
 ### Tech stack
 
@@ -295,57 +277,54 @@ Moving auth to a real backend is still open work.
 
 ## Troubleshooting
 
-**The QR code scans, but the project never opens in Expo Go.**
-This is almost always the Expo account. You must be signed in on your computer *and* in Expo Go,
-with the same account:
+**The iPhone can't reach my computer (FES or the QR code just spins).**
+The phone and computer must be on the same Wi-Fi, and campus networks often block traffic between
+devices. Try, in order:
+1. On Windows, make sure Node.js is allowed through Windows Firewall on **Private** networks.
+2. On the iPhone: **Settings → FES → Local Network → On**.
+3. Use a tunnel: `npm run start:tunnel` (or connect both to a phone hotspot).
 
-```bash
-npx expo whoami     # shows your username, or "Not logged in"
-npx expo login      # sign in if needed
-```
+**`npm run ios:device` says "No code signing certificates are available to use".**
+Xcode doesn't know your Apple ID yet: **Xcode → Settings → Accounts → `+`**, then rerun.
 
-Then open Expo Go on your phone, check you are signed in under the Account tab, and scan again.
-The running project also appears under **Development servers** in Expo Go once both sides match.
+**"The app identifier … cannot be registered to your development team because it is not
+available".**
+Someone else's Apple ID already owns that bundle ID. Put a unique one in `.env.local`, for example
+`FES_IOS_BUNDLE_ID=com.insightwisconsin.fes.yourname`, and rerun `npm run ios:device`.
 
-**The QR code will not connect.**
-Your phone and computer must be on the same Wi-Fi network. University and office networks often
-block the connection between devices. Use a tunnel instead:
+**Xcode is "too old" or the build fails right away.**
+Expo SDK 57 needs **Xcode 26.4+**. Update it from the Mac App Store. If Xcode says the iOS platform
+isn't installed: **Xcode → Settings → Components** → install iOS.
 
-```bash
-npm run start:tunnel
-```
+**FES opened fine last week but now won't launch.**
+Free Apple ID installs expire after 7 days. Plug the phone in and run `npm run ios:device` again.
+
+**The Bluetooth banner says "Bluetooth needs a development build".**
+You're in Expo Go (`npm run start:go`). Open the FES app instead, or install it first: see
+[Get the FES app on your iPhone](#get-the-fes-app-on-your-iphone).
+
+**"Bluetooth permission is off".**
+**Settings → FES → Bluetooth → On**, then tap the banner again.
+
+**"Device not found. Make sure the ESP32 is powered on."**
+Scanning worked but nothing advertised as `Divij_ESP32` within 15 seconds. Check the ESP32 is
+powered and flashed, and that no other phone is already connected to it.
 
 **Something looks broken after pulling new changes.**
-Clear the bundler cache and reinstall:
 
 ```bash
 npm run start:clear
 ```
 
-If that does not help:
-
-```bash
-rm -rf node_modules
-npm ci
-npm run start:clear
-```
+If that does not help, reinstall dependencies with `rm -rf node_modules && npm ci`. If the change
+added a native library, rebuild the FES app (`npm run ios:device`).
 
 **`npm ci` fails.**
-Usually means `package-lock.json` and `package.json` have drifted apart. Use `npm install` once,
-then commit the updated lockfile.
-
-**Expo Go says the project needs a different SDK version.**
-Update Expo Go from the App Store or Play Store. Expo Go only supports the current SDK (57).
-
-**"Bluetooth needs a development build".**
-Expected in Expo Go. See [Running on real FES hardware](#running-on-real-fes-hardware).
+Usually `package-lock.json` and `package.json` have drifted apart. Run `npm install` once, then
+commit the updated lockfile.
 
 **Port 8081 is already in use.**
-Another dev server is running. Either stop it, or pick a different port:
-
-```bash
-npm start -- --port 8082
-```
+Another dev server is running. Stop it, or use `npm start -- --port 8082`.
 
 **Check for configuration problems.**
 
