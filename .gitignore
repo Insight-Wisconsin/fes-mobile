@@ -155,6 +155,7 @@ build/
 
 # Cursor IDE
 .cursor/
+.codex/
 .cursorignore
 
 # Environment variables and secrets
