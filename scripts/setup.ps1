@@ -137,6 +137,7 @@ if ($NpxExe) {
 The FES app gets onto your iPhone once (iPhone needs iOS 16.4 or newer):
 
   - Now:   plug your iPhone into a Mac teammate's Mac. They run:
+             rm -rf ios
              npm run ios:device
   - Later: once the team's paid/UW Apple account is set up, run from here:
              npm run ios:register     (once per iPhone)

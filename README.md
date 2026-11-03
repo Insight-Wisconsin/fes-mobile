@@ -122,7 +122,8 @@ library or a Bluetooth/permission setting) or, on a free Apple ID, every 7 days.
 ### Windows: now (via a teammate's Mac)
 
 Plug your iPhone into a Mac teammate's Mac and have them run `npm run ios:device`, picking
-**your** iPhone. That's it. From then on you develop from your PC (see
+**your** iPhone. If that Mac has already built FES, run `rm -rf ios` first so Xcode can register
+yours. That's it. From then on you develop from your PC (see
 [Daily development](#daily-development)). With free Apple IDs, the install expires after 7 days,
 so repeat this weekly.
 
@@ -285,7 +286,24 @@ devices. Try, in order:
 3. Use a tunnel: `npm run start:tunnel` (or connect both to a phone hotspot).
 
 **`npm run ios:device` says "No code signing certificates are available to use".**
-Xcode doesn't know your Apple ID yet: **Xcode → Settings → Accounts → `+`**, then rerun.
+This Mac has no signing certificate yet. Adding the Apple ID doesn't always create one.
+1. **Xcode → Settings → Accounts.** If your Apple ID isn't listed, click **`+`** and sign in.
+2. Select your Apple ID, then the **(Personal Team)** row, then **Manage Certificates…**
+3. Click **`+`** → **Apple Development** → **Done**.
+4. Check that `security find-identity -p codesigning -v` lists an "Apple Development" identity, then rerun.
+
+If that doesn't work, run `open ios/*.xcworkspace`, select **FES** → **Signing & Capabilities**, tick
+**Automatically manage signing**, and set **Team** to your Personal Team. Xcode creates the certificate.
+Quit Xcode, then run `rm -rf ios` and `npm run ios:device` so Expo sets up signing again with it.
+
+**`npm run ios:device` says "No profiles for … were found", or that the profile "doesn't include the
+currently selected device".**
+Expo only lets Xcode create profiles and register new iPhones the first time it sets up signing in
+`ios/`. Run `rm -rf ios`, then `npm run ios:device`. The folder is regenerated, so nothing is lost.
+
+If it still fails, build from Xcode: run `open ios/*.xcworkspace`, select **FES** → **Signing &
+Capabilities**, tick **Automatically manage signing**, set **Team** to your Personal Team, pick the
+iPhone at the top of the window, and click **▶ Run**.
 
 **"The app identifier … cannot be registered to your development team because it is not
 available".**
@@ -297,7 +315,8 @@ Expo SDK 57 needs **Xcode 26.4+**. Update it from the Mac App Store. If Xcode sa
 isn't installed: **Xcode → Settings → Components** → install iOS.
 
 **FES opened fine last week but now won't launch.**
-Free Apple ID installs expire after 7 days. Plug the phone in and run `npm run ios:device` again.
+Free Apple ID installs expire after 7 days. Plug the phone in, then run `rm -rf ios` and
+`npm run ios:device` again.
 
 **The Bluetooth banner says "Bluetooth needs a development build".**
 You're in Expo Go (`npm run start:go`). Open the FES app instead, or install it first: see

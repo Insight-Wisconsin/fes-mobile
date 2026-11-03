@@ -190,9 +190,10 @@ if [ "$IS_MAC" -eq 1 ]; then
   5. When FES asks for "Local Network" access, tap Allow.
 
 Every day after that:   npm start   then open FES on your iPhone.
-Rebuild (step 3) only after native changes -- or every 7 days on a free Apple ID.
+Rebuild only after native changes -- or every 7 days on a free Apple ID:
+run  rm -rf ios  then step 3.
 
-Teammate on Windows? Plug their iPhone into this Mac and run step 3 for them.
+Another iPhone (like a Windows teammate's)? Plug it in, run  rm -rf ios  then step 3.
 EOF
 else
   cat <<'EOF'
@@ -203,6 +204,7 @@ Building the FES app onto an iPhone needs Xcode, which only runs on macOS.
 So the FES app gets onto your iPhone once (iOS 16.4 or newer), in one of two ways:
 
   - Now:   plug your iPhone into a Mac teammate's Mac. They run:
+             rm -rf ios
              npm run ios:device
   - Later: once the team's paid/UW Apple account is set up, run from here:
              npm run ios:register     (once per iPhone)
