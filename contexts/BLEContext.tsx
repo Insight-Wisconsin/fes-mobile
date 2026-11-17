@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { Alert } from 'react-native';
 import {
   bleService,
+  BLEDeviceData,
   BLEConnectionState,
   BLE_UNAVAILABLE_MESSAGE,
   isBLESupported,
@@ -10,6 +11,8 @@ import {
 interface BLEContextType {
   connectionState: BLEConnectionState;
   statusMessage: string;
+  deviceData: BLEDeviceData | null;
+  deviceDataError: string | null;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   setIntensity: (level: number) => Promise<void>;
@@ -31,6 +34,8 @@ export const BLEProvider = ({ children }: { children: ReactNode }) => {
   const [statusMessage, setStatusMessage] = useState(
     isBLESupported ? 'Not connected' : BLE_UNAVAILABLE_MESSAGE
   );
+  const [deviceData, setDeviceData] = useState<BLEDeviceData | null>(null);
+  const [deviceDataError, setDeviceDataError] = useState<string | null>(null);
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -38,6 +43,11 @@ export const BLEProvider = ({ children }: { children: ReactNode }) => {
       if (!isMounted.current) return;
       setConnectionState(state);
       setStatusMessage(message ?? stateToMessage(state));
+    });
+    bleService.setDataCallback((data, error) => {
+      if (!isMounted.current) return;
+      setDeviceData(data);
+      setDeviceDataError(error ?? null);
     });
 
     return () => {
@@ -92,6 +102,8 @@ export const BLEProvider = ({ children }: { children: ReactNode }) => {
   const value: BLEContextType = {
     connectionState,
     statusMessage,
+    deviceData,
+    deviceDataError,
     connect,
     disconnect,
     setIntensity,

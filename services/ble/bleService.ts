@@ -1,10 +1,11 @@
-import { BleManager, Device, Characteristic, State } from 'react-native-ble-plx';
+import { BleManager, Device, Characteristic, State, Subscription } from 'react-native-ble-plx';
 import { Platform, PermissionsAndroid, NativeModules } from 'react-native';
 import { Buffer } from 'buffer';
 
 const ESP32_DEVICE_NAME = 'Divij_ESP32';
 const SERVICE_UUID = '12345678-1234-1234-1234-123456789abc';
 const CHARACTERISTIC_UUID = 'abcdefab-1234-1234-1234-abcdefabcdef';
+const TELEMETRY_UUID = '87654321-4321-4321-4321-cba987654321';
 
 const CMD_SET_INTENSITY = 0x01;
 const CMD_START_STIM = 0x02;
@@ -45,11 +46,22 @@ export type BLEConnectionState =
 
 export type BLEEventCallback = (state: BLEConnectionState, message?: string) => void;
 
+export interface BLEDeviceData {
+  batteryPercent: number;
+  sampleValue: number;
+  packetSequence: number;
+  receivedAt: number;
+}
+
+export type BLEDataCallback = (data: BLEDeviceData | null, error?: string) => void;
+
 class BLEService {
   private manager: BleManager | null = null;
   private device: Device | null = null;
   private characteristic: Characteristic | null = null;
+  private telemetrySubscription: Subscription | null = null;
   private onStateChange: BLEEventCallback | null = null;
+  private onDataChange: BLEDataCallback | null = null;
   private connectionState: BLEConnectionState = isBLESupported ? 'disconnected' : 'unavailable';
   private isDestroyed = false;
 
@@ -78,6 +90,10 @@ class BLEService {
 
   setStateCallback(callback: BLEEventCallback) {
     this.onStateChange = callback;
+  }
+
+  setDataCallback(callback: BLEDataCallback) {
+    this.onDataChange = callback;
   }
 
   getConnectionState(): BLEConnectionState {
@@ -257,12 +273,79 @@ class BLEService {
     this.characteristic = targetChar;
 
     connectedDevice.onDisconnected((error, disconnectedDevice) => {
+      this.telemetrySubscription?.remove();
+      this.telemetrySubscription = null;
       this.device = null;
       this.characteristic = null;
+      this.onDataChange?.(null);
       this.updateState('disconnected', 'Device disconnected');
     });
 
+    const telemetryChar = characteristics.find(
+      (c) => c.uuid.toLowerCase() === TELEMETRY_UUID.toLowerCase()
+    );
+    if (!telemetryChar) {
+      throw new Error('FES telemetry characteristic not found on device');
+    }
+
+    this.onDataChange?.(null);
+    this.telemetrySubscription?.remove();
+    this.telemetrySubscription = discoveredDevice.monitorCharacteristicForService(
+      SERVICE_UUID,
+      TELEMETRY_UUID,
+      (error, characteristic) => {
+        if (error) {
+          this.onDataChange?.(null, `Telemetry notification error: ${error.message}`);
+          return;
+        }
+        if (!characteristic?.value) {
+          this.onDataChange?.(null, 'Telemetry notification contained no data');
+          return;
+        }
+        this.publishTelemetry(characteristic.value);
+      }
+    );
+
+    try {
+      const currentTelemetry = await discoveredDevice.readCharacteristicForService(
+        SERVICE_UUID,
+        TELEMETRY_UUID
+      );
+      if (!currentTelemetry.value) {
+        this.onDataChange?.(null, 'ESP32 returned an empty telemetry value');
+      } else {
+        this.publishTelemetry(currentTelemetry.value);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.onDataChange?.(null, `Could not read initial telemetry: ${message}`);
+    }
+
     this.updateState('connected', 'Connected to ESP32');
+  }
+
+  private publishTelemetry(base64Value: string): void {
+    try {
+      const packet = Buffer.from(base64Value, 'base64');
+      if (packet.length !== 3) {
+        throw new Error(`Expected 3 telemetry bytes, received ${packet.length}`);
+      }
+
+      const batteryPercent = packet.readUInt8(0);
+      if (batteryPercent > 100) {
+        throw new Error(`Battery percentage is out of range: ${batteryPercent}`);
+      }
+
+      this.onDataChange?.({
+        batteryPercent,
+        sampleValue: packet.readInt8(1),
+        packetSequence: packet.readUInt8(2),
+        receivedAt: Date.now(),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.onDataChange?.(null, `Invalid ESP32 telemetry packet: ${message}`);
+    }
   }
 
   private async writeCommand(command: number, value: number): Promise<void> {
@@ -298,6 +381,9 @@ class BLEService {
   }
 
   async disconnect(): Promise<void> {
+    this.telemetrySubscription?.remove();
+    this.telemetrySubscription = null;
+    this.onDataChange?.(null);
     if (this.device) {
       try {
         await this.device.cancelConnection();

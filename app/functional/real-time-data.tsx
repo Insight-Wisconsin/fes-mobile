@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { calibrationService } from '../../services/backend/calibration';
+import { useBLE } from '../../contexts/BLEContext';
 
 // Safe number formatter
 const formatNumber = (value: number | undefined | null): string => {
@@ -28,6 +29,7 @@ const getSafeValue = (obj: any, prop: string): number => {
 export default function RealTimeData() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const ble = useBLE();
   
   // Raw sensor data state
   const [gyroData, setGyroData] = useState({ x: 0, y: 0, z: 0 });
@@ -238,6 +240,35 @@ export default function RealTimeData() {
               Movement Magnitude: {formatNumber(accelMagnitude)}
             </ThemedText>
           </View>
+        </View>
+
+        <ThemedText type="title" style={styles.sectionTitle}>ESP32 Telemetry</ThemedText>
+        <View style={styles.dataCard}>
+          {ble.deviceData ? (
+            <>
+              <ThemedText style={styles.dataLabel}>
+                Battery: {ble.deviceData.batteryPercent}%
+              </ThemedText>
+              <ThemedText style={styles.dataLabel}>
+                Sample value: {ble.deviceData.sampleValue}
+              </ThemedText>
+              <ThemedText style={styles.dataLabel}>
+                Packet: {ble.deviceData.packetSequence}
+              </ThemedText>
+              <ThemedText style={styles.dataLabel}>
+                Received: {new Date(ble.deviceData.receivedAt).toLocaleTimeString()}
+              </ThemedText>
+            </>
+          ) : (
+            <ThemedText style={styles.dataLabel}>
+              {ble.deviceDataError ?? (ble.isConnected
+                ? 'Waiting for telemetry from the ESP32...'
+                : 'Connect to the ESP32 from the home screen to read telemetry.')}
+            </ThemedText>
+          )}
+          {ble.deviceDataError && ble.deviceData && (
+            <ThemedText style={styles.dataLabel}>{ble.deviceDataError}</ThemedText>
+          )}
         </View>
 
         <ThemedText type='title' style={styles.sectionTitle}>Instructions</ThemedText>
