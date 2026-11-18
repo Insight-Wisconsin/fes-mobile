@@ -1,4 +1,4 @@
-import { StyleSheet, View, TouchableOpacity, ScrollView, Animated, PanResponder, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, ScrollView, Animated, PanResponder, ActivityIndicator, Alert } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -399,7 +399,7 @@ const IntensityDial = ({ value, onValueChange }: IntensityDialProps) => {
   }, [value, normalizedValue]);
 
   const handleTouch = (nativeEvent: any, gestureState?: any) => {
-    const { locationX, locationY, pageX, pageY } = nativeEvent;
+    const { locationX, locationY } = nativeEvent;
     
     // Get the container's position relative to screen
     const containerX = locationX;
@@ -512,9 +512,6 @@ const IntensityDial = ({ value, onValueChange }: IntensityDialProps) => {
     const y = centerY + radius * Math.sin(rad);
     return { x, y, angle: notchAngle, value: i + 1 };
   });
-  
-  // Calculate active arc end angle
-  const activeEndAngle = startAngle + progress * totalAngle;
 
   return (
     <View style={styles.intensityContainer}>

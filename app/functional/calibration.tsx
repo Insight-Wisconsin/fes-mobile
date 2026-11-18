@@ -22,12 +22,10 @@ export default function CalibrationScreen() {
     validationMessage: ''
   });
   const [calibrationResults, setCalibrationResults] = useState<CalibrationResult[]>([]);
-  const [calibrationComplete, setCalibrationComplete] = useState(false);
 
   const handleStartCalibration = async () => {
     try {
       setIsCalibrating(true);
-      setCalibrationComplete(false);
       setCalibrationResults([]);
       
       await calibrationService.startCalibration(
@@ -37,7 +35,6 @@ export default function CalibrationScreen() {
         },
         (results) => {
           setCalibrationResults(results);
-          setCalibrationComplete(true);
           setIsCalibrating(false);
           setCurrentStep(2);
 
@@ -64,12 +61,6 @@ export default function CalibrationScreen() {
       );
       setIsCalibrating(false);
     }
-  };
-
-
-  const handleComplete = () => {
-    // Navigate back to home after calibration
-    router.back();
   };
 
   return (

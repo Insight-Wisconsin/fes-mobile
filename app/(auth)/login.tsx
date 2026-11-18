@@ -27,7 +27,7 @@ export default function LoginScreen() {
       } else {
         Alert.alert('Login Failed', result.error || 'An error occurred');
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setLoading(false);

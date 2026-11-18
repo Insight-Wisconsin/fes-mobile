@@ -181,18 +181,15 @@ export class CalibrationService {
 
   // ---------------- PERFORM EACH STEP ----------------
   private async performCalibrationStep(stepNumber: number): Promise<CalibrationResult> {
-    const maxMonitoringDuration = 25000;
     const stabilityWindowSize = 15;
     const stabilityThreshold = 3.0;
     const minStableDuration = 800;
     const baselineThreshold = 5.0;
     const dropThreshold = 8.0;
 
-    const startTime = Date.now();
     const angleHistory: number[] = [];
 
     let baselineAngle: number | null = null;
-    let hasReturnedToBaseline = false;
     let hasDetectedDrop = false;
     let stableAngle: number | null = null;
     let stableStartTime: number | null = null;
@@ -306,7 +303,6 @@ export class CalibrationService {
                   if (baselineReturnStart === null) {
                     baselineReturnStart = Date.now();
                   } else if (Date.now() - baselineReturnStart >= 500) {
-                    hasReturnedToBaseline = true;
                     break;
                   }
                 } else {
@@ -364,10 +360,6 @@ export class CalibrationService {
     Speech.stop(); // Stop any ongoing speech
   }
 
-  getCalibrationResults() {
-    return [...this.calibrationResults];
-  }
-
   getValidCalibrationResults() {
     return this.calibrationResults.filter(r => r.isValid);
   }
@@ -376,14 +368,6 @@ export class CalibrationService {
     const vals = this.getValidCalibrationResults();
     if (vals.length === 0) return 0;
     return vals.reduce((sum, r) => sum + r.angle, 0) / vals.length;
-  }
-
-  isCalibrationComplete() {
-    return this.calibrationResults.length >= 5;
-  }
-
-  hasValidCalibration() {
-    return this.getValidCalibrationResults().length >= 4;
   }
 }
 
