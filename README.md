@@ -215,7 +215,10 @@ Every command is 2 bytes (`[command, value]`):
 The ESP32 telemetry characteristic is read once after connecting and monitored for updates. It
 sends a 3-byte packet: battery percentage (`uint8`), sample value (`int8`), and packet sequence
 (`uint8`). The sample value is the second value emitted by the firmware; it is not measured BLE
-signal strength. The telemetry UUID is `87654321-4321-4321-4321-cba987654321`.
+signal strength. The telemetry UUID is `87654321-4321-4321-4321-cba987654321`. The firmware in
+[`firmware/esp32_firmware.ino`](firmware/esp32_firmware.ino) sends simulated values for now. An
+ESP32 running older firmware without this characteristic still connects and takes commands; the
+Real-time data screen tells you to flash the new sketch.
 
 The device name, service/characteristic UUIDs and command bytes live in
 [`services/ble/bleService.ts`](services/ble/bleService.ts).
