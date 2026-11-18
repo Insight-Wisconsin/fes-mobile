@@ -19,7 +19,6 @@ export default function SessionScreen() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const [isSessionActive, setIsSessionActive] = useState(false);
-  const [currentAngle, setCurrentAngle] = useState(0);
   const [calibrationAngle, setCalibrationAngle] = useState(0);
   const [impulseCount, setImpulseCount] = useState(0);
   const [isImpulsing, setIsImpulsing] = useState(false);
@@ -368,7 +367,6 @@ export default function SessionScreen() {
             // Get absolute yaw angle (we don't care about direction)
             const rawAngle = Math.abs(integratedYaw.current);
             const smoothedAngle = smoothAngle(rawAngle);
-            setCurrentAngle(smoothedAngle);
             recorderRef.current?.addAngleSample({
               recordedAt: now,
               angle: smoothedAngle,
@@ -423,7 +421,6 @@ export default function SessionScreen() {
 
   const handleStopSession = () => {
     setIsSessionActive(false);
-    setCurrentAngle(0);
     previousAngle.current = null;
     hasTriggeredForDrop.current = false;
     // Reset gyroscope integration

@@ -1,9 +1,13 @@
 # FESMobile
 
 FESMobile is a mobile app that assists people with **foot drop** using a Functional Electrical
-Stimulation (FES) device. The phone is worn on the leg; the app reads the gyroscope in real time,
-detects gait events, and triggers timed electrical impulses over Bluetooth to smooth out the
-walking pattern.
+Stimulation (FES) device. The app detects foot drop while walking and triggers timed electrical
+impulses over Bluetooth to smooth out the walking pattern.
+
+Detection currently uses the phone's gyroscope, with the phone worn on the leg. The plan is to
+move this to an external IMU that streams to the app through the ESP32, so the phone can stay in
+a pocket. The ESP32 already sends telemetry to the app (simulated values for now); see
+[`firmware/`](firmware/).
 
 Built with React Native and Expo. Developed by **Insight Wisconsin – UW–Madison**.
 
@@ -311,6 +315,7 @@ fesmobile/
 │   ├── database/             # On-phone SQLite: schema, queries, session recording
 │   └── backend/              # Calibration capture (gyroscope + voice prompts)
 │
+├── firmware/                 # ESP32 Arduino sketch (commands in, telemetry out)
 ├── assets/images/            # App icon and splash screen
 ├── scripts/                  # setup.sh / setup.ps1 for new contributors; ios-device.sh builds onto iPhones; test-database.mjs
 ├── app.json                  # Expo configuration and permissions
@@ -330,7 +335,7 @@ segment. `app/functional/home.tsx` is the main screen after login. The current r
 | `/functional/home` | Main screen: BLE status, intensity dial, session shortcuts |
 | `/functional/calibration` | Per-user calibration flow |
 | `/functional/session` | Live gait session with impulse triggering |
-| `/functional/real-time-data` | Raw gyroscope / accelerometer readouts and ESP32 BLE telemetry |
+| `/functional/real-time-data` | Raw accelerometer readouts and ESP32 BLE telemetry |
 | `/functional/settings` | Settings |
 
 The iOS folder is **generated**, not committed: `npm run ios:device` creates `ios/` from

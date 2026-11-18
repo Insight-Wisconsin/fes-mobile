@@ -41,7 +41,7 @@ export default function SignupScreen() {
       } else {
         Alert.alert('Signup Failed', result.error || 'An error occurred');
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setLoading(false);

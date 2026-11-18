@@ -78,7 +78,7 @@ export const BLEProvider = ({ children }: { children: ReactNode }) => {
   const startStimulation = useCallback(async () => {
     try {
       await bleService.startStimulation();
-    } catch (err: any) {
+    } catch {
       Alert.alert('BLE Error', 'Failed to start stimulation');
     }
   }, []);
@@ -86,7 +86,7 @@ export const BLEProvider = ({ children }: { children: ReactNode }) => {
   const stopStimulation = useCallback(async () => {
     try {
       await bleService.stopStimulation();
-    } catch (err: any) {
+    } catch {
       Alert.alert('BLE Error', 'Failed to stop stimulation');
     }
   }, []);

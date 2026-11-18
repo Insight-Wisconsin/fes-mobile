@@ -1,13 +1,10 @@
 import { ThemedText } from '@/components/themed-text';
-import React from 'react';
-import { StyleSheet, View, ScrollView, Alert } from 'react-native';
-import { Gyroscope, DeviceMotion, Accelerometer } from 'expo-sensors';
-import { useEffect, useState, useRef } from 'react';
-import { TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { StyleSheet, View, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { Accelerometer } from 'expo-sensors';
 import { ThemedView } from '@/components/themed-view';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { calibrationService } from '../../services/backend/calibration';
 import { useBLE } from '../../contexts/BLEContext';
 
 // Safe number formatter
@@ -32,12 +29,10 @@ export default function RealTimeData() {
   const ble = useBLE();
   
   // Raw sensor data state
-  const [gyroData, setGyroData] = useState({ x: 0, y: 0, z: 0 });
   const [accelData, setAccelData] = useState({ x: 0, y: 0, z: 0 });
   const [angleData, setAngleData] = useState({ x: 0, y: 0, z: 0 });
   
   // Data smoothing refs
-  const gyroHistory = useRef<Array<{x: number, y: number, z: number}>>([]);
   const accelHistory = useRef<Array<{x: number, y: number, z: number}>>([]);
   const angleHistory = useRef<Array<{x: number, y: number, z: number}>>([]);
 
@@ -96,51 +91,6 @@ export default function RealTimeData() {
     };
   };
 
-  // Gyroscope listener (for rotation rate only)
-  useEffect(() => {
-    let gyroSubscription: any = null;
-    
-    const startGyroscope = async () => {
-      try {
-        console.log('Starting gyroscope...');
-        const isAvailable = await Gyroscope.isAvailableAsync();
-        console.log('Gyroscope available:', isAvailable);
-        
-        if (isAvailable) {
-          Gyroscope.setUpdateInterval(50); // Very fast updates
-          gyroSubscription = Gyroscope.addListener((data) => {
-            if (data && typeof data === 'object') {
-              const rawData = {
-                x: getSafeValue(data, 'x'),
-                y: getSafeValue(data, 'y'),
-                z: getSafeValue(data, 'z')
-              };
-              
-              // Apply smoothing
-              const smoothedData = smoothSensorData(rawData, gyroHistory, 3);
-              setGyroData(smoothedData);
-            }
-          });
-          console.log('Gyroscope listener added');
-        } else {
-          Alert.alert('Gyroscope Not Available', 'This device does not have a gyroscope or it is not accessible.');
-        }
-      } catch (error) {
-        console.error('Gyroscope error:', error);
-        Alert.alert('Gyroscope Error', `Failed to access gyroscope: ${error}`);
-      }
-    };
-
-    startGyroscope();
-
-    return () => {
-      if (gyroSubscription) {
-        gyroSubscription.remove();
-        console.log('Gyroscope listener removed');
-      }
-    };
-  }, []);
-
   // Accelerometer listener
   useEffect(() => {
     let accelSubscription: any = null;
@@ -191,10 +141,6 @@ export default function RealTimeData() {
     };
   }, []);
 
-  // Note: calibration service now uses gyroscope directly, so updateAngleData is no longer needed
-
-  // Calculate magnitudes
-  const gyroMagnitude = Math.sqrt(gyroData.x * gyroData.x + gyroData.y * gyroData.y + gyroData.z * gyroData.z);
   const accelMagnitude = Math.sqrt(accelData.x * accelData.x + accelData.y * accelData.y + accelData.z * accelData.z);
 
   return (
