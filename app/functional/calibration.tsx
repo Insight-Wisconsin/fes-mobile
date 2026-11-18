@@ -4,11 +4,14 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { calibrationService, CalibrationProgress, CalibrationResult } from '../../services/backend/calibration';
+import { storage } from '@/services/database';
+import { useAuth } from '@/contexts/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CalibrationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -37,7 +40,14 @@ export default function CalibrationScreen() {
           setCalibrationComplete(true);
           setIsCalibrating(false);
           setCurrentStep(2);
-          
+
+          // Keep it for later sessions. Saves nothing if no angle was valid.
+          storage.saveCalibration({
+            userId: user?.id ?? null,
+            sensorSource: 'phone_gyroscope',
+            samples: results,
+          });
+
           Alert.alert(
             'Calibration Complete',
             `Calibration successful! All 5 foot angles captured.`,

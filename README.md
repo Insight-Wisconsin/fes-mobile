@@ -17,6 +17,7 @@ Built with React Native and Expo. Developed by **Insight Wisconsin – UW–Madi
 - [Get the FES app on your iPhone](#get-the-fes-app-on-your-iphone)
 - [Daily development](#daily-development)
 - [Connecting to the ESP32](#connecting-to-the-esp32)
+- [Data storage](#data-storage)
 - [Available commands](#available-commands)
 - [Project layout](#project-layout)
 - [Troubleshooting](#troubleshooting)
@@ -217,6 +218,50 @@ The device name, service/characteristic UUIDs and command bytes live in
 
 ---
 
+## Data storage
+
+The app saves its data **on the phone**, in a SQLite database (`fes.db`, via
+[expo-sqlite](https://docs.expo.dev/versions/latest/sdk/sqlite/)). Nothing leaves the phone yet.
+
+| Table | What it holds |
+|---|---|
+| `calibrations` | One row per calibration: when, the average "stuck" angle, how many captures were valid |
+| `calibration_samples` | Each captured angle in a calibration (5 per calibration) |
+| `sessions` | One row per session: start and end time, length, intensity, impulse count, the calibration angle used |
+| `session_impulses` | Each impulse fired: when, and at what angle |
+| `session_angle_samples` | The angle stream during a session (about 50 readings a second) |
+| `settings` | App settings, such as the last intensity chosen on the dial |
+
+What saves what:
+
+- **Calibration** saves itself when it completes. Sessions use the latest saved calibration, so it
+  survives restarting the app.
+- **A session** is recorded from Start until Stop (or leaving the screen). Angle readings and
+  impulses are written once a second. If the app closes mid-session, the next launch marks that
+  session `interrupted` and ends it at its last saved reading.
+- **The intensity dial** is saved when it settles and restored when the app opens. A session
+  records the intensity it started with.
+- **The Sessions card** on the home screen counts the saved sessions.
+
+The code lives in [`services/database/`](services/database/). Screens use `storage` and
+`SessionRecorder`. The SQL is all in `repository.ts`. To change the schema, **add** a migration at
+the end of `schema.ts`. Never edit one that has already been released, because phones that ran it
+won't run it again. Then run the tests:
+
+```bash
+npm run test:db
+```
+
+They run the real schema and queries against Node's built-in SQLite (Node 22.18+), so no phone is
+needed.
+
+**Storage needs a rebuilt FES app.** expo-sqlite is a native library, so an FES app built before it
+was added has no storage. That app still works, but saves nothing, and logs
+`[DB] Storage is not available in this build`. Rebuild it with `npm run ios:device`. Expo Go
+includes SQLite, so `npm run start:go` saves data too. The browser (`npm run web`) never saves.
+
+---
+
 ## Available commands
 
 Run these from the repository root.
@@ -234,6 +279,7 @@ Run these from the repository root.
 | `npm run web` | Open the app in a browser (no Bluetooth) |
 | `npm run typecheck` | Run TypeScript with no emit |
 | `npm run lint` | Run ESLint |
+| `npm run test:db` | Test the database schema and queries (no phone needed) |
 | `npm run doctor` | Check the project for dependency and config problems |
 
 ---
@@ -254,10 +300,11 @@ fesmobile/
 ├── hooks/                    # Colour scheme and theme hooks
 ├── services/
 │   ├── ble/                  # Bluetooth: scanning, connecting, sending commands
-│   └── backend/              # Calibration storage
+│   ├── database/             # On-phone SQLite: schema, queries, session recording
+│   └── backend/              # Calibration capture (gyroscope + voice prompts)
 │
 ├── assets/images/            # App icon and splash screen
-├── scripts/                  # setup.sh / setup.ps1 for new contributors; ios-device.sh builds onto iPhones
+├── scripts/                  # setup.sh / setup.ps1 for new contributors; ios-device.sh builds onto iPhones; test-database.mjs
 ├── app.json                  # Expo configuration and permissions
 ├── app.config.js             # Per-developer iOS overrides, read from .env.local
 ├── .env.example              # Documents the .env.local variables
@@ -293,6 +340,7 @@ change, so there are no native-project merge conflicts.
 | Bluetooth | react-native-ble-plx 3.5 |
 | Sensors | expo-sensors (gyroscope) |
 | Audio | expo-audio |
+| Storage | expo-sqlite (SQLite on the phone) |
 | Language | TypeScript (strict) |
 
 ### A note on authentication
