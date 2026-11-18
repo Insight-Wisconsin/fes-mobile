@@ -74,9 +74,12 @@ If any are missing, it stops and tells you which one to get.
 ## Setup
 
 ```bash
-git clone https://github.com/Insight-Wisconsin/fes-mobile.git
+git clone -b production-ble https://github.com/Insight-Wisconsin/fes-mobile.git
 cd fes-mobile
 ```
+
+Already have it? From inside the `fes-mobile` folder: `git checkout production-ble`, then `git pull`.
+Then run the setup script below.
 
 **Mac / Linux / Git Bash:**
 
@@ -102,28 +105,53 @@ library or a Bluetooth/permission setting) or, on a free Apple ID, every 7 days.
 
 ### On a Mac
 
-1. **Xcode → Settings → Accounts → `+`** → sign in with your Apple ID (a free one works).
+1. **Once per Mac:** **Xcode → Settings → Accounts → `+`** → sign in with your Apple ID (a free one
+   works). Then select the **(Personal Team)** row → **Manage Certificates…** → **`+`** →
+   **Apple Development** → **Done**.
 2. **Plug the iPhone in with a cable**, unlock it, and tap **Trust This Computer**.
-3. Build and install:
+3. **On the iPhone:** **Settings → Privacy & Security → Developer Mode → On**. It restarts; tap
+   **Turn On**. If the setting isn't there yet, it appears after step 4 runs once. Turn it on, then
+   run step 4 again.
+4. Build and install:
 
    ```bash
    npm run ios:device
    ```
 
-   Pick your iPhone from the list. The first build takes about 5–15 minutes; later ones are much
-   faster.
-4. **On the iPhone**, if iOS won't open FES:
-   - **Settings → Privacy & Security → Developer Mode → On**, then restart the phone.
-   - With a **free Apple ID**, also go to **Settings → General → VPN & Device Management**, tap
-     your Apple ID, and tap **Trust**.
-5. When FES asks to find devices on your **Local Network**, tap **Allow**. That's how it reaches
-   your computer.
+   - Pick your iPhone from the list. The first build takes about 10–20 minutes; later ones reuse
+     it and are much faster.
+   - If it asks for a signing team, pick **(Personal Team)**.
+   - If the Mac asks for a keychain password, type the **Mac's login password** and click
+     **Always Allow**.
+5. **On the iPhone:** **Settings → General → VPN & Device Management** → tap your Apple ID →
+   **Trust**.
+6. Open FES. When it asks to find devices on your **Local Network**, tap **Allow**. That's how it
+   reaches your computer.
+
+### Rebuilding (new iPhone, 7-day reinstall, native changes)
+
+Plug the iPhone in and run the same command, `npm run ios:device`. You don't need to delete
+anything first:
+
+- It **reuses the last build**, so it's much faster than the first one.
+- It **rebuilds from scratch by itself** when `app.json`, `app.config.js`, `package.json` or
+  `.env.local` changed since the last build, so native changes always get in.
+- It lets Xcode **register a new iPhone or renew an expired install** on every build. (Plain
+  `npx expo run:ios` can't after its first build, which causes the "No profiles" error.)
+
+To skip the iPhone list, pass the ID the build prints after `Using --device`:
+
+```bash
+npm run ios:device -- 00008140-0123456789ABCDEF
+```
+
+A new iPhone also needs steps 2, 3 and 5 above. The logic lives in
+[`scripts/ios-device.sh`](scripts/ios-device.sh).
 
 ### Windows: now (via a teammate's Mac)
 
 Plug your iPhone into a Mac teammate's Mac and have them run `npm run ios:device`, picking
-**your** iPhone. If that Mac has already built FES, run `rm -rf ios` first so Xcode can register
-yours. That's it. From then on you develop from your PC (see
+**your** iPhone. That's it. From then on you develop from your PC (see
 [Daily development](#daily-development)). With free Apple IDs, the install expires after 7 days,
 so repeat this weekly.
 
@@ -204,7 +232,7 @@ Run these from the repository root.
 | `npm run start:clear` | Same, clearing the bundler cache (fixes most stale-cache bugs) |
 | `npm run start:tunnel` | Same, through a tunnel, for when campus Wi-Fi blocks phone ↔ computer traffic |
 | `npm run start:go` | Dev server for **Expo Go** (UI preview, no Bluetooth) |
-| `npm run ios:device` | **Mac:** build and install the FES app on a USB-connected iPhone |
+| `npm run ios:device` | **Mac:** build and install the FES app on a USB-connected iPhone (new iPhone or 7-day reinstall) |
 | `npm run ios` | **Mac:** run in the iOS Simulator (UI only; the Simulator has no Bluetooth) |
 | `npm run ios:register` | Cloud builds: register an iPhone (needs the team's paid Apple account) |
 | `npm run ios:build` | Cloud builds: build the FES app on Expo's servers (needs the team's paid Apple account) |
@@ -234,7 +262,7 @@ fesmobile/
 │   └── backend/              # Calibration storage
 │
 ├── assets/images/            # App icon and splash screen
-├── scripts/                  # setup.sh / setup.ps1 for new contributors
+├── scripts/                  # setup.sh / setup.ps1 for new contributors; ios-device.sh builds onto iPhones
 ├── app.json                  # Expo configuration and permissions
 ├── app.config.js             # Per-developer iOS overrides, read from .env.local
 ├── .env.example              # Documents the .env.local variables
@@ -256,7 +284,8 @@ segment. `app/functional/home.tsx` is the main screen after login. The current r
 | `/functional/settings` | Settings |
 
 The iOS folder is **generated**, not committed: `npm run ios:device` creates `ios/` from
-`app.json` each time it's needed, so there are no native-project merge conflicts.
+`app.json` and regenerates it when `app.json`, `app.config.js`, `package.json` or `.env.local`
+change, so there are no native-project merge conflicts.
 
 ### Tech stack
 
@@ -299,14 +328,16 @@ This Mac has no signing certificate yet. Adding the Apple ID doesn't always crea
 
 If that doesn't work, run `open ios/*.xcworkspace`, select **FES** → **Signing & Capabilities**, tick
 **Automatically manage signing**, and set **Team** to your Personal Team. Xcode creates the certificate.
-Quit Xcode, then run `rm -rf ios` and `npm run ios:device` so Expo sets up signing again with it.
+Quit Xcode and rerun `npm run ios:device`.
 
-**`npm run ios:device` says "No profiles for … were found", or that the profile "doesn't include the
-currently selected device".**
-Expo only lets Xcode create profiles and register new iPhones the first time it sets up signing in
-`ios/`. Run `rm -rf ios`, then `npm run ios:device`. The folder is regenerated, so nothing is lost.
+**The build says "No profiles for … were found", or that the profile "doesn't include the currently
+selected device".**
+`npm run ios:device` normally prevents this: it clears the signing team Expo saves in `ios/`, so Xcode
+can create profiles and register iPhones on every build. Make sure you ran `npm run ios:device`, not
+`npx expo run:ios`. If it still happens, run `rm -rf ios`, then `npm run ios:device`. The folder is
+regenerated, so nothing is lost.
 
-If it still fails, build from Xcode: run `open ios/*.xcworkspace`, select **FES** → **Signing &
+If that fails too, build from Xcode: run `open ios/*.xcworkspace`, select **FES** → **Signing &
 Capabilities**, tick **Automatically manage signing**, set **Team** to your Personal Team, pick the
 iPhone at the top of the window, and click **▶ Run**.
 
@@ -320,8 +351,7 @@ Expo SDK 57 needs **Xcode 26.4+**. Update it from the Mac App Store. If Xcode sa
 isn't installed: **Xcode → Settings → Components** → install iOS.
 
 **FES opened fine last week but now won't launch.**
-Free Apple ID installs expire after 7 days. Plug the phone in, then run `rm -rf ios` and
-`npm run ios:device` again.
+Free Apple ID installs expire after 7 days. Plug the phone in and run `npm run ios:device` again.
 
 **The Bluetooth banner says "Bluetooth needs a development build".**
 You're in Expo Go (`npm run start:go`). Open the FES app instead, or install it first: see

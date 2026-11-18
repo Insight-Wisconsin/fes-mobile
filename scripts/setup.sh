@@ -181,19 +181,26 @@ if [ "$IS_MAC" -eq 1 ]; then
 
 ==> Setup complete. Put the FES app on your iPhone (needs iOS 16.4 or newer):
 
-  1. Xcode > Settings > Accounts > "+" > add your Apple ID (a free one works).
+  1. Once per Mac: Xcode > Settings > Accounts > "+" > add your Apple ID (a free one
+     works). Then select the "(Personal Team)" row > Manage Certificates > "+" >
+     Apple Development > Done.
   2. Plug your iPhone into this Mac with a cable. Unlock it and tap "Trust".
-  3. Run:   npm run ios:device      (pick your iPhone; first build ~5-15 min)
-  4. On the iPhone, if iOS refuses to open FES:
-       - Settings > Privacy & Security > Developer Mode > On (then restart)
-       - Free Apple ID: Settings > General > VPN & Device Management > trust yourself
-  5. When FES asks for "Local Network" access, tap Allow.
+  3. On the iPhone: Settings > Privacy & Security > Developer Mode > On (it restarts).
+     Not there yet? It appears after step 4 runs once. Turn it on, then rerun step 4.
+  4. Run:   npm run ios:device      (pick your iPhone; first build ~10-20 min)
+       - Signing team prompt: pick "(Personal Team)".
+       - Keychain password prompt: this Mac's login password, then "Always Allow".
+  5. On the iPhone: Settings > General > VPN & Device Management > your Apple ID > Trust.
+  6. Open FES. When it asks for "Local Network" access, tap Allow.
 
 Every day after that:   npm start   then open FES on your iPhone.
-Rebuild only after native changes -- or every 7 days on a free Apple ID:
-run  rm -rf ios  then step 3.
 
-Another iPhone (like a Windows teammate's)? Plug it in, run  rm -rf ios  then step 3.
+Rerun step 4 (no need to delete anything; it's faster after the first build) for:
+  - another iPhone, like a Windows teammate's (plug it in, then steps 2-5)
+  - the 7-day expiry on a free Apple ID
+  - native changes (app.json, new native libraries); it rebuilds from scratch by itself
+
+Skip the iPhone list:   npm run ios:device -- <ID shown after "Using --device">
 EOF
 else
   cat <<'EOF'
@@ -204,7 +211,6 @@ Building the FES app onto an iPhone needs Xcode, which only runs on macOS.
 So the FES app gets onto your iPhone once (iOS 16.4 or newer), in one of two ways:
 
   - Now:   plug your iPhone into a Mac teammate's Mac. They run:
-             rm -rf ios
              npm run ios:device
   - Later: once the team's paid/UW Apple account is set up, run from here:
              npm run ios:register     (once per iPhone)

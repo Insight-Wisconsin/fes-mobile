@@ -7,7 +7,7 @@
     "start:clear": "expo start --dev-client --clear",
     "start:tunnel": "expo start --dev-client --tunnel",
     "start:go": "expo start --go",
-    "ios:device": "expo run:ios --device",
+    "ios:device": "bash scripts/ios-device.sh",
     "ios": "expo run:ios",
     "ios:register": "npx --yes eas-cli@25 device:create",
     "ios:build": "npx --yes eas-cli@25 build --profile development --platform ios",
