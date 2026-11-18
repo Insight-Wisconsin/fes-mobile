@@ -5,6 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, useEffect, useRef } from 'react';
 import { Gyroscope } from 'expo-sensors';
 import { calibrationService } from '../../services/backend/calibration';
+import { storage } from '@/services/database';
+import { SessionRecorder } from '@/services/database/sessionRecorder';
+import { useAuth } from '@/contexts/AuthContext';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
@@ -13,6 +16,8 @@ import { Buffer } from 'buffer';
 export default function SessionScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [currentAngle, setCurrentAngle] = useState(0);
   const [calibrationAngle, setCalibrationAngle] = useState(0);
@@ -34,6 +39,10 @@ export default function SessionScreen() {
   // Gyroscope tracking for yaw angle
   const integratedYaw = useRef<number>(0);
   const lastGyroTimestamp = useRef<number | null>(null);
+
+  // Saving the session: which calibration it uses, and the live recorder
+  const calibrationIdRef = useRef<string | null>(null);
+  const recorderRef = useRef<SessionRecorder | null>(null);
 
   // Initialize audio on mount
   useEffect(() => {
@@ -57,29 +66,44 @@ export default function SessionScreen() {
     };
   }, []);
 
-  // Get calibration angle on mount (already absolute from calibration service)
+  // Get calibration angle on mount: the latest saved calibration, or (if
+  // storage is unavailable) the one made earlier in this run of the app
   useEffect(() => {
-    const avgAngle = calibrationService.getAverageCalibrationAngle();
-    if (avgAngle === 0) {
-      Alert.alert(
-        'No Calibration Found',
-        'Please calibrate your device before starting a session.',
-        [
-          {
-            text: 'Go to Calibration',
-            onPress: () => router.push('/functional/calibration' as any),
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel',
-            onPress: () => router.back(),
-          },
-        ]
-      );
-    } else {
-      setCalibrationAngle(Math.abs(avgAngle)); // Ensure absolute value
-    }
-  }, []);
+    let isMounted = true;
+
+    const loadCalibration = async () => {
+      const saved = await storage.getLatestCalibration(userId);
+      if (!isMounted) return;
+
+      calibrationIdRef.current = saved?.id ?? null;
+      const avgAngle = saved?.averageAngle ?? calibrationService.getAverageCalibrationAngle();
+
+      if (avgAngle === 0) {
+        Alert.alert(
+          'No Calibration Found',
+          'Please calibrate your device before starting a session.',
+          [
+            {
+              text: 'Go to Calibration',
+              onPress: () => router.push('/functional/calibration' as any),
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => router.back(),
+            },
+          ]
+        );
+      } else {
+        setCalibrationAngle(Math.abs(avgAngle)); // Ensure absolute value
+      }
+    };
+
+    loadCalibration();
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
 
   // Smooth angle data (using absolute values)
   const smoothAngle = (newAngle: number): number => {
@@ -184,13 +208,14 @@ export default function SessionScreen() {
   };
 
   // Trigger impulse (screen flash + sound + haptic)
-  const triggerImpulse = async () => {
+  const triggerImpulse = async (angle: number) => {
     const now = Date.now();
     if (now - lastImpulseTime.current < IMPULSE_COOLDOWN) {
       return; // Cooldown period
     }
     lastImpulseTime.current = now;
-    
+    recorderRef.current?.addImpulse({ occurredAt: now, angle });
+
     setIsImpulsing(true);
     setImpulseCount(prev => prev + 1);
 
@@ -274,13 +299,13 @@ export default function SessionScreen() {
       // - We haven't triggered for this drop yet
       // - Foot was below target and is now at/above target
       if (isWithinThreshold && isDropping && !hasTriggeredForDrop.current && wasBelowTarget && isAtOrAboveTarget) {
-        triggerImpulse();
+        triggerImpulse(absAngle);
         hasTriggeredForDrop.current = true;
       }
     } else {
       // First reading - just check if within threshold and at/above target
       if (isWithinThreshold && absAngle >= calibrationAngle - threshold) {
-        triggerImpulse();
+        triggerImpulse(absAngle);
         hasTriggeredForDrop.current = true;
       }
     }
@@ -294,6 +319,23 @@ export default function SessionScreen() {
     if (!isSessionActive || calibrationAngle === 0) return;
 
     let gyroSubscription: any = null;
+
+    // Record this session. If it is stopped before the recorder is ready, the
+    // recorder is finished as soon as it arrives.
+    let isStopped = false;
+    const recorderReady = SessionRecorder.start({
+      userId,
+      calibrationId: calibrationIdRef.current,
+      calibrationAngle,
+      sensorSource: 'phone_gyroscope',
+    }).then((recorder) => {
+      if (isStopped) {
+        recorder?.finish();
+        return null;
+      }
+      recorderRef.current = recorder;
+      return recorder;
+    });
 
     const startMonitoring = async () => {
       try {
@@ -327,6 +369,11 @@ export default function SessionScreen() {
             const rawAngle = Math.abs(integratedYaw.current);
             const smoothedAngle = smoothAngle(rawAngle);
             setCurrentAngle(smoothedAngle);
+            recorderRef.current?.addAngleSample({
+              recordedAt: now,
+              angle: smoothedAngle,
+              rawAngle,
+            });
 
             // Check for foot drop (angle is already absolute)
             checkFootDrop(smoothedAngle);
@@ -348,8 +395,13 @@ export default function SessionScreen() {
       // Reset integration when stopping
       integratedYaw.current = 0;
       lastGyroTimestamp.current = null;
+
+      // Save the session (runs on Stop and when leaving the screen)
+      isStopped = true;
+      recorderRef.current = null;
+      recorderReady.then((recorder) => recorder?.finish());
     };
-  }, [isSessionActive, calibrationAngle]);
+  }, [isSessionActive, calibrationAngle, userId]);
 
   const handleStartSession = () => {
     if (calibrationAngle === 0) {

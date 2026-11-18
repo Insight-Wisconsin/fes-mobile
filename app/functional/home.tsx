@@ -1,12 +1,14 @@
 import { StyleSheet, View, TouchableOpacity, ScrollView, Animated, PanResponder, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
+import { DEFAULT_INTENSITY, storage } from '@/services/database';
+import { bucketSessionStarts, statsRangeStart, type StatsBucket } from '@/services/database/stats';
 import { useBLE } from '@/contexts/BLEContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SideMenu } from '@/components/side-menu';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 type IntensityDialProps = {
   value: number; // 1-10
@@ -16,6 +18,7 @@ type IntensityDialProps = {
 type SessionsCardProps = {
   view: 'day' | 'month' | 'year';
   onViewChange: (view: 'day' | 'month' | 'year') => void;
+  userId: string | null;
 };
 
 const AnimatedIcon = ({ menuVisible }: { menuVisible: boolean }) => {
@@ -116,8 +119,24 @@ export default function HomeScreen() {
   const ble = useBLE();
   const insets = useSafeAreaInsets();
   const [menuVisible, setMenuVisible] = useState(false);
-  const [intensity, setIntensity] = useState(5);
+  const [intensity, setIntensity] = useState(DEFAULT_INTENSITY);
   const [sessionView, setSessionView] = useState<'day' | 'month' | 'year'>('day');
+  const hasLoadedIntensity = useRef(false);
+
+  // Restore the last intensity the user chose
+  useEffect(() => {
+    storage.getIntensity().then((saved) => {
+      if (saved !== null && saved >= 1) setIntensity(saved);
+      hasLoadedIntensity.current = true;
+    });
+  }, []);
+
+  // Save intensity once the dial settles (dragging changes it many times)
+  useEffect(() => {
+    if (!hasLoadedIntensity.current) return;
+    const timer = setTimeout(() => storage.setIntensity(intensity), 500);
+    return () => clearTimeout(timer);
+  }, [intensity]);
 
   // Send intensity over BLE whenever it changes (only if connected)
   useEffect(() => {
@@ -240,7 +259,7 @@ export default function HomeScreen() {
 
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Sessions</ThemedText>
-          <SessionsCard view={sessionView} onViewChange={setSessionView} />
+          <SessionsCard view={sessionView} onViewChange={setSessionView} userId={user?.id ?? null} />
         </View>
       </ScrollView>
 
@@ -249,41 +268,26 @@ export default function HomeScreen() {
   );
 }
 
-const SessionsCard = ({ view, onViewChange }: SessionsCardProps) => {
-  // Simple mock data for proof of concept
-  const getMockData = () => {
-    if (view === 'day') {
-      // Last 7 days
-      return [
-        { label: 'Mon', value: 3, displayLabel: 'Mon' },
-        { label: 'Tue', value: 5, displayLabel: 'Tue' },
-        { label: 'Wed', value: 4, displayLabel: 'Wed' },
-        { label: 'Thu', value: 6, displayLabel: 'Thu' },
-        { label: 'Fri', value: 5, displayLabel: 'Fri' },
-        { label: 'Sat', value: 2, displayLabel: 'Sat' },
-        { label: 'Sun', value: 3, displayLabel: 'Sun' },
-      ];
-    } else if (view === 'month') {
-      // Last 4 weeks
-      return [
-        { label: 'W1', value: 15, displayLabel: 'W1' },
-        { label: 'W2', value: 22, displayLabel: 'W2' },
-        { label: 'W3', value: 18, displayLabel: 'W3' },
-        { label: 'W4', value: 25, displayLabel: 'W4' },
-      ];
-    } else {
-      // Last 12 months
-      const months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-      const values = [45, 52, 58, 63, 71, 68, 75, 82, 78, 85, 90, 88];
-      return months.map((month, i) => ({
-        label: month,
-        value: values[i],
-        displayLabel: month,
-      }));
-    }
-  };
+const SessionsCard = ({ view, onViewChange, userId }: SessionsCardProps) => {
+  // Saved sessions per day / week / month. Reloads whenever home comes back
+  // into view, so a session that just ended shows up straight away.
+  const [data, setData] = useState<StatsBucket[]>(() => bucketSessionStarts(view, []));
 
-  const data = getMockData();
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      const now = new Date();
+      storage.getSessionsStartedSince(userId, statsRangeStart(view, now)).then((sessions) => {
+        if (isActive) {
+          setData(bucketSessionStarts(view, sessions.map((s) => s.startedAt), now));
+        }
+      });
+      return () => {
+        isActive = false;
+      };
+    }, [view, userId])
+  );
+
   const maxValue = Math.max(...data.map(d => d.value), 1);
   const avgValue = data.reduce((sum, d) => sum + d.value, 0) / data.length;
   const totalSessions = Math.floor(data.reduce((sum, d) => sum + d.value, 0));
@@ -354,9 +358,7 @@ const SessionsCard = ({ view, onViewChange }: SessionsCardProps) => {
                     ]}
                   />
                 </View>
-                {item.displayLabel && (
-                  <ThemedText style={styles.barLabel}>{item.displayLabel}</ThemedText>
-                )}
+                <ThemedText style={styles.barLabel}>{item.label}</ThemedText>
               </View>
             );
           })}
